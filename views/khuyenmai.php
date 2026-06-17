@@ -1,3 +1,11 @@
+<?php
+/**
+ * Dòng này để báo cho VS Code biết các biến này được truyền từ Controller sang
+ * @var string $action
+ * @var array $danhSachKM
+ * @var array $khuyenMai
+ */
+?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>

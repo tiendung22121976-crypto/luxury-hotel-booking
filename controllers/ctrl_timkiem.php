@@ -5,11 +5,16 @@ require_once '../models/mdl_phong.php';
 // Kiểm tra xem khách có bấm nút "Tìm Kiếm" từ form không
 // Giả sử form dùng phương thức GET
 if (isset($_GET['btn_timkiem'])) {
-    
+
     // 1. Nhận dữ liệu từ Form (HTML cần có các input name="diadiem", "checkin", "checkout")
-    $diaDiemKS = $_GET['diadiem']; // Ví dụ: 'HN01' hoặc 'DN01'
-    $ngayNhan = $_GET['checkin'];
-    $ngayTra = $_GET['checkout'];
+    $diaDiemKS = $_GET['diadiem'] ?? ''; // Ví dụ: 'HN01' hoặc 'DN01'
+    $ngayNhan = $_GET['checkin'] ?? '';
+    $ngayTra = $_GET['checkout'] ?? '';
+    //Thêm dòng này để chặn nếu bỏ thông tin trống
+    if (empty($diaDiemKS) || empty($ngayNhan) || empty($ngayTra)) {
+        echo "<script>alert('Vui lòng nhập đầy đủ thông tin tìm kiếm!'); history.back();</script>";
+        exit;
+    }
 
     // Lọc lỗi cơ bản: Ngày trả phải lớn hơn ngày nhận
     if (strtotime($ngayTra) <= strtotime($ngayNhan)) {
@@ -23,7 +28,7 @@ if (isset($_GET['btn_timkiem'])) {
     // 3. Đưa dữ liệu sang View (Giao diện) để in ra màn hình
     // Ở đây mình tạm dùng print_r để test thử data trước khi làm giao diện đẹp
     echo "<h3>Kết quả tìm kiếm từ $ngayNhan đến $ngayTra:</h3>";
-    
+
     if (count($danhSachPhongTrong) > 0) {
         echo "<pre>";
         print_r($danhSachPhongTrong); // In mảng ra xem kết quả DB trả về đúng không
@@ -32,4 +37,3 @@ if (isset($_GET['btn_timkiem'])) {
         echo "<p>Rất tiếc, đã hết phòng trống trong khoảng thời gian này!</p>";
     }
 }
-?>
