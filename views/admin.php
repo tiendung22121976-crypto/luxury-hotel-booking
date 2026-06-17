@@ -38,7 +38,7 @@ $soLuongKhach   = $pdo->query("SELECT COUNT(*) FROM tai_khoan WHERE VaiTro = 'Th
                 <div class="bg-navy text-gold rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
                     <span>👤</span>
                 </div>
-                <strong class="text-navy"><?php echo htmlspecialchars($_SESSION['user']['HoTen']); ?></strong>
+                <!-- <strong class="text-navy"><?php echo htmlspecialchars($_SESSION['user']['HoTen']); ?></strong> -->
             </div>
             <div class="list-group list-group-flush">
                 <a href="admin.php" class="list-group-item list-group-item-action border-0 rounded-3 fw-bold text-navy bg-light mb-1">🏠 Trang Chủ</a>
