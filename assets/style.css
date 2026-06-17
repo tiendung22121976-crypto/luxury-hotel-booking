@@ -1,0 +1,64 @@
+body {
+    background-color: #cdf5f7;
+    color: #333;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+i.fa-solid.fa-star {
+    color: rgb(213, 213, 18);
+}
+.img-placeholder {
+    background-color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    font-weight: bold;
+    border: 1px solid #dee2e6;
+}
+
+.hero-section {
+    padding: 60px 0 80px 0;
+    text-align: center;
+    background-color:rgb(255, 255, 255);
+
+}
+
+.search-box {
+    background: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: -40px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.img-placeholder {
+    background-color: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #adb5bd;
+    font-weight: bold;
+    border: 1px solid #dee2e6;
+    height: 100%;
+    min-height: 200px;
+}
+
+.filter-box {
+    border: 2px solid #333;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.nav-link.custom-btn {
+    border: 2px solid #333;
+    border-radius: 4px;
+    padding: 5px 15px !important;
+    color: #333;
+    font-weight: 500;
+}
+
+.nav-link.custom-btn:hover {
+    background-color: #333;
+    color: #fff;
+}

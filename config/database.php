@@ -20,7 +20,7 @@ try {
     // Khởi tạo đối tượng PDO
     $pdo = new PDO($dsn, $user, $pass, $options);
     // Dòng dưới dùng để test kết nối Database
-    echo "Kết nối Database luxuryhotel_webbooking thành công!";
+    // echo "Kết nối Database luxuryhotel_webbooking thành công!";
 } catch (\PDOException $e) {
     // Bắt lỗi nếu kết nối thất bại
     die("Lỗi kết nối CSDL: " . $e->getMessage());
