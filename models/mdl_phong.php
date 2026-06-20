@@ -1,175 +1,193 @@
 <?php
-// Gọi file kết nối Database vào đây
-require_once '../config/database.php';
+/**
+ * models/mdl_phong.php
+ * Các hàm truy vấn CSDL cho bảng phong, loai_phong
+ * Bao gồm: tìm phòng trống, CRUD admin, helper dropdown
+ */
+require_once __DIR__ . '/../config/database.php';
 
-function timPhongTrong($maKS, $ngayNhan, $ngayTra)
-{
-    global $pdo; // Sử dụng biến kết nối PDO từ database.php
+// ============================================================
+// HÀM DÙNG CHUNG CHO PHÍA KHÁCH (FRONTEND)
+// ============================================================
 
-    // Câu lệnh SQL "Lõi"
+/**
+ * Tìm phòng trống theo địa điểm (MaKS) và khoảng ngày
+ * Logic: phòng Available, chưa có đơn đặt còn hiệu lực trùng ngày
+ */
+function timPhongTrong($maKS, $ngayNhan, $ngayTra) {
+    global $pdo;
     $sql = "
-    SELECT p.MaPhong, p.SoPhong, lp.TenLoai, lp.DonGia, lp.MoTa 
-    FROM phong p
-    JOIN loai_phong lp ON p.MaLoai = lp.MaLoai
-    WHERE p.MaKS = :maKS 
-    AND p.TrangThai = 'Available'
-    AND p.MaPhong NOT IN (
-        SELECT MaPhong 
-        FROM don_dat_phong 
-        WHERE TrangThaiDon != 'DaHuy' 
-        AND (NgayNhan < :ngayTra AND NgayTra > :ngayNhan)
-    )
-";
-
+        SELECT p.MaPhong, p.SoPhong, lp.TenLoai, lp.DonGia, lp.DienTich, lp.TienIch, lp.MoTa,
+               ks.TenKS, ks.DiaChi
+        FROM phong p
+        JOIN loai_phong lp ON p.MaLoai = lp.MaLoai
+        JOIN khach_san  ks ON p.MaKS   = ks.MaKS
+        WHERE p.MaKS = :maKS
+          AND p.TrangThai = 'Available'
+          AND p.MaPhong NOT IN (
+              SELECT MaPhong FROM don_dat_phong
+              WHERE TrangThaiDon != 'DaHuy'
+                AND NgayNhan < :ngayTra
+                AND NgayTra  > :ngayNhan
+          )
+        ORDER BY lp.DonGia ASC
+    ";
     try {
         $stmt = $pdo->prepare($sql);
-        // Gắn dữ liệu an toàn để chống SQL Injection
-        $stmt->bindParam(':maKS', $maKS);
-        $stmt->bindParam(':ngayNhan', $ngayNhan);
-        $stmt->bindParam(':ngayTra', $ngayTra);
-
-        $stmt->execute();
-
-        // Trả về mảng chứa danh sách các phòng trống tìm được
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        echo "Lỗi thuật toán tìm phòng: " . $e->getMessage();
-        return [];
-    }
-}
-// =======================================================
-// CÁC HÀM DÀNH CHO PHÂN HỆ QUẢN TRỊ ADMIN (CRUD PHÒNG)
-// =======================================================
-
-function getAllPhongAdmin()
-{
-    global $pdo;
-    // Dùng JOIN để lấy tên thật của Khách sạn và Loại phòng thay vì chỉ hiển thị Mã code
-    $sql = "SELECT p.*, ks.TenKS, lp.TenLoai 
-            FROM phong p 
-            JOIN khach_san ks ON p.MaKS = ks.MaKS 
-            JOIN loai_phong lp ON p.MaLoai = lp.MaLoai 
-            ORDER BY p.MaKS ASC, p.SoPhong ASC";
-    try {
-        $stmt = $pdo->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->execute([':maKS' => $maKS, ':ngayNhan' => $ngayNhan, ':ngayTra' => $ngayTra]);
+        return $stmt->fetchAll();
     } catch (PDOException $e) {
         return [];
     }
 }
 
-function getPhongById($maPhong)
-{
+/**
+ * Lấy chi tiết 1 phòng kèm thông tin loại và khách sạn (dùng cho trang room-detail)
+ */
+function getChiTietPhong($maPhong) {
     global $pdo;
-    $sql = "SELECT * FROM phong WHERE MaPhong = :maPhong";
+    $sql = "
+        SELECT p.*, lp.TenLoai, lp.DonGia, lp.DienTich, lp.TienIch, lp.MoTa AS MoTaLoai,
+               ks.TenKS, ks.DiaChi
+        FROM phong p
+        JOIN loai_phong lp ON p.MaLoai = lp.MaLoai
+        JOIN khach_san  ks ON p.MaKS   = ks.MaKS
+        WHERE p.MaPhong = :maPhong
+    ";
     try {
         $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maPhong', $maPhong);
+        $stmt->execute([':maPhong' => $maPhong]);
+        return $stmt->fetch();
+    } catch (PDOException $e) { return false; }
+}
+
+/**
+ * Lấy danh sách phòng nổi bật cho trang chủ (Available, giới hạn số lượng)
+ */
+function getPhongNoiBat($limit = 6) {
+    global $pdo;
+    $sql = "
+        SELECT p.MaPhong, p.SoPhong, p.TrangThai,
+               lp.TenLoai, lp.DonGia, lp.DienTich, lp.TienIch, lp.MoTa,
+               ks.TenKS, ks.DiaChi
+        FROM phong p
+        JOIN loai_phong lp ON p.MaLoai = lp.MaLoai
+        JOIN khach_san  ks ON p.MaKS   = ks.MaKS
+        WHERE p.TrangThai = 'Available'
+        ORDER BY lp.DonGia DESC
+        LIMIT :limit
+    ";
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        return false;
-    }
+        return $stmt->fetchAll();
+    } catch (PDOException $e) { return []; }
 }
 
-function checkPhongExists($maPhong)
-{
+// ============================================================
+// HÀM CRUD DÀNH CHO ADMIN
+// ============================================================
+
+function getAllPhongAdmin() {
     global $pdo;
-    $sql = "SELECT COUNT(*) as count FROM phong WHERE MaPhong = :maPhong";
+    $sql = "
+        SELECT p.*, ks.TenKS, lp.TenLoai, lp.DonGia
+        FROM phong p
+        JOIN khach_san  ks ON p.MaKS   = ks.MaKS
+        JOIN loai_phong lp ON p.MaLoai = lp.MaLoai
+        ORDER BY p.MaKS ASC, p.SoPhong ASC
+    ";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maPhong', $maPhong);
-        $stmt->execute();
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row['count'] > 0;
-    } catch (PDOException $e) {
-        return false;
-    }
+        return $pdo->query($sql)->fetchAll();
+    } catch (PDOException $e) { return []; }
 }
 
-// Hai hàm hỗ trợ lấy danh sách thả xuống (Dropdown list)
-function getDanhSachKS()
-{
+function getPhongById($maPhong) {
     global $pdo;
-    $sql = "SELECT MaKS, TenKS FROM khach_san";
     try {
-        $stmt = $pdo->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        return [];
-    }
+        $stmt = $pdo->prepare("SELECT * FROM phong WHERE MaPhong = :maPhong");
+        $stmt->execute([':maPhong' => $maPhong]);
+        return $stmt->fetch();
+    } catch (PDOException $e) { return false; }
 }
 
-function getDanhSachLoaiPhong()
-{
+function checkPhongExists($maPhong) {
     global $pdo;
-    $sql = "SELECT MaLoai, TenLoai FROM loai_phong";
     try {
-        $stmt = $pdo->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        return [];
-    }
+        $stmt = $pdo->prepare("SELECT COUNT(*) as cnt FROM phong WHERE MaPhong = :maPhong");
+        $stmt->execute([':maPhong' => $maPhong]);
+        return $stmt->fetch()['cnt'] > 0;
+    } catch (PDOException $e) { return false; }
 }
 
-function addPhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai)
-{
+// Dropdown helper: danh sách khách sạn
+function getDanhSachKS() {
     global $pdo;
-    $sql = "INSERT INTO phong (MaPhong, SoPhong, MaKS, MaLoai, TrangThai) VALUES (:maPhong, :soPhong, :maKS, :maLoai, :trangThai)";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maPhong', $maPhong);
-        $stmt->bindParam(':soPhong', $soPhong);
-        $stmt->bindParam(':maKS', $maKS);
-        $stmt->bindParam(':maLoai', $maLoai);
-        $stmt->bindParam(':trangThai', $trangThai);
-        return $stmt->execute();
-    } catch (PDOException $e) {
-        return false;
-    }
+        return $pdo->query("SELECT MaKS, TenKS FROM khach_san ORDER BY TenKS ASC")->fetchAll();
+    } catch (PDOException $e) { return []; }
 }
 
-function updatePhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai)
-{
+// Dropdown helper: danh sách loại phòng
+function getDanhSachLoaiPhong() {
     global $pdo;
-    $sql = "UPDATE phong SET SoPhong = :soPhong, MaKS = :maKS, MaLoai = :maLoai, TrangThai = :trangThai WHERE MaPhong = :maPhong";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maPhong', $maPhong);
-        $stmt->bindParam(':soPhong', $soPhong);
-        $stmt->bindParam(':maKS', $maKS);
-        $stmt->bindParam(':maLoai', $maLoai);
-        $stmt->bindParam(':trangThai', $trangThai);
-        return $stmt->execute();
-    } catch (PDOException $e) {
-        return false;
-    }
+        return $pdo->query("SELECT MaLoai, TenLoai, DonGia FROM loai_phong ORDER BY DonGia ASC")->fetchAll();
+    } catch (PDOException $e) { return []; }
 }
 
-function kiemTraPhongDangHoatDong($maPhong)
-{
+function addPhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai) {
     global $pdo;
-    $sql = "SELECT COUNT(*) as count FROM don_dat_phong WHERE MaPhong = :maPhong AND TrangThaiDon NOT IN ('DaHuy', 'HoanTat')";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maPhong', $maPhong);
-        $stmt->execute();
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row['count'] > 0;
-    } catch (PDOException $e) {
-        return false;
-    }
+        $stmt = $pdo->prepare(
+            "INSERT INTO phong (MaPhong, SoPhong, MaKS, MaLoai, TrangThai)
+             VALUES (:maPhong, :soPhong, :maKS, :maLoai, :trangThai)"
+        );
+        return $stmt->execute([
+            ':maPhong'   => $maPhong,
+            ':soPhong'   => $soPhong,
+            ':maKS'      => $maKS,
+            ':maLoai'    => $maLoai,
+            ':trangThai' => $trangThai,
+        ]);
+    } catch (PDOException $e) { return false; }
 }
 
-function deletePhong($maPhong)
-{
+function updatePhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai) {
     global $pdo;
-    $sql = "DELETE FROM phong WHERE MaPhong = :maPhong";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maPhong', $maPhong);
-        return $stmt->execute();
-    } catch (PDOException $e) {
-        return false;
-    }
+        $stmt = $pdo->prepare(
+            "UPDATE phong SET SoPhong = :soPhong, MaKS = :maKS, MaLoai = :maLoai, TrangThai = :trangThai
+             WHERE MaPhong = :maPhong"
+        );
+        return $stmt->execute([
+            ':maPhong'   => $maPhong,
+            ':soPhong'   => $soPhong,
+            ':maKS'      => $maKS,
+            ':maLoai'    => $maLoai,
+            ':trangThai' => $trangThai,
+        ]);
+    } catch (PDOException $e) { return false; }
+}
+
+// Kiểm tra trước khi xóa: không xóa nếu còn đơn đặt chưa kết thúc
+function kiemTraPhongDangHoatDong($maPhong) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) as cnt FROM don_dat_phong
+             WHERE MaPhong = :maPhong AND TrangThaiDon NOT IN ('DaHuy','HoanTat')"
+        );
+        $stmt->execute([':maPhong' => $maPhong]);
+        return $stmt->fetch()['cnt'] > 0;
+    } catch (PDOException $e) { return false; }
+}
+
+function deletePhong($maPhong) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("DELETE FROM phong WHERE MaPhong = :maPhong");
+        return $stmt->execute([':maPhong' => $maPhong]);
+    } catch (PDOException $e) { return false; }
 }

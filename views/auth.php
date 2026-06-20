@@ -1,121 +1,188 @@
-<?php 
-include_once 'header.php'; 
+<?php
+/**
+ * auth.php
+ * -----------------------------------------------------------
+ * Trang Đăng nhập / Đăng ký (UC02: Đăng ký tài khoản + đăng nhập)
+ * Chức năng:
+ *  - Đăng nhập bằng Email + Mật khẩu, so sánh trực tiếp (plain-text,
+ *    KHÔNG mã hóa/băm mật khẩu).
+ *  - Đăng ký tài khoản mới, kiểm tra Email/SĐT chưa tồn tại (UNIQUE).
+ *  - Lưu thông tin phiên làm việc vào session_start().
+ * -----------------------------------------------------------
+ */
+session_start();
+require_once '../config/database.php';
+require_once '../includes/functions.php';
 
-$error = '';
-$success = '';
+// Nếu đã đăng nhập rồi thì không cần vào trang này nữa
+if (daDangNhap()) {
+    header('Location: ' . (laAdmin() ? 'admin.php' : 'index.php'));
+    exit;
+}
 
-// Xử lý Sự kiện Submit Form từ Client
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action']) && $_POST['action'] === 'login') {
-        // XỬ LÝ ĐĂNG NHẬP
-        $email = trim($_POST['email']);
-        $password = trim($_POST['password']);
-        
-        $stmt = $pdo->prepare("SELECT * FROM tai_khoan WHERE Email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch();
-        
-        // Kiểm tra mật khẩu (Sử dụng so sánh trực tiếp hoặc password_verify tùy cấu hình của bạn)
-        if ($user && ($password === $user['MatKhau'] || password_verify($password, $user['MatKhau']))) {
-            $_SESSION['user'] = $user;
-            echo "<script>window.location.href='index.php';</script>";
-            exit();
+$mode = ($_GET['mode'] ?? '') === 'register' ? 'register' : 'login';
+$loiDangNhap = '';
+$loiDangKy = '';
+$emailDaNhap = '';
+
+// ── XỬ LÝ ĐĂNG NHẬP ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dangNhap') {
+    $email = trim($_POST['email'] ?? '');
+    $matKhau = $_POST['matKhau'] ?? '';
+
+    if (!$email || !$matKhau) {
+        $loiDangNhap = 'Vui lòng nhập đầy đủ email và mật khẩu.';
+    } else {
+        $stmt = $pdo->prepare("SELECT MaTK, HoTen, Email, MatKhau, VaiTro FROM tai_khoan WHERE Email = :email LIMIT 1");
+        $stmt->bindParam(':email', $email);
+        $stmt->execute();
+        $taiKhoan = $stmt->fetch();
+
+        if (!$taiKhoan || $matKhau !== $taiKhoan['MatKhau']) {
+            $loiDangNhap = 'Email hoặc mật khẩu không chính xác.';
         } else {
-            $error = 'Email hoặc mật khẩu không chính xác!';
-        }
-    } elseif (isset($_POST['action']) && $_POST['action'] === 'register') {
-        // XỬ LÝ ĐĂNG KÝ THÀNH VIÊN MỚI
-        $fullname = trim($_POST['fullname']);
-        $email = trim($_POST['email']);
-        $phone = trim($_POST['phone']);
-        $password = trim($_POST['password']);
-        
-        // Kiểm tra xem Email đã đăng ký chưa
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM tai_khoan WHERE Email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->fetchColumn() > 0) {
-            $error = 'Email này đã tồn tại trên hệ thống!';
-        } else {
-            $stmtInsert = $pdo->prepare("INSERT INTO tai_khoan (HoTen, Email, SDT, MatKhau, VaiTro) VALUES (?, ?, ?, ?, 'ThanhVien')");
-            if ($stmtInsert->execute([$fullname, $email, $phone, $password])) {
-                $success = 'Tạo tài khoản thành công! Vui lòng đăng nhập.';
-            } else {
-                $error = 'Đã có lỗi xảy ra khi đăng ký.';
-            }
+            // Lưu thông tin phiên làm việc
+            $_SESSION['MaTK']   = $taiKhoan['MaTK'];
+            $_SESSION['HoTen']  = $taiKhoan['HoTen'];
+            $_SESSION['Email']  = $taiKhoan['Email'];
+            $_SESSION['VaiTro'] = $taiKhoan['VaiTro'];
+
+            $diaChiChuyenHuong = $taiKhoan['VaiTro'] === 'Admin' ? 'admin.php' : 'index.php';
+            if (!empty($_GET['redirect'])) $diaChiChuyenHuong = $_GET['redirect'];
+            header('Location: ' . $diaChiChuyenHuong . (strpos($diaChiChuyenHuong, '?') === false ? '?' : '&') . 'msg=' . urlencode('Đăng nhập thành công!') . '&type=success');
+            exit;
         }
     }
 }
+
+// ── XỬ LÝ ĐĂNG KÝ ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dangKy') {
+    $mode = 'register';
+    $hoTen   = trim($_POST['hoTen'] ?? '');
+    $email   = trim($_POST['email'] ?? '');
+    $sdt     = trim($_POST['sdt'] ?? '');
+    $matKhau = $_POST['matKhau'] ?? '';
+    $matKhau2 = $_POST['matKhau2'] ?? '';
+    $emailDaNhap = $email;
+
+    if (!$hoTen || !$email || !$sdt) {
+        $loiDangKy = 'Vui lòng nhập đầy đủ họ tên, email và số điện thoại.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $loiDangKy = 'Email không hợp lệ.';
+    } elseif (strlen($matKhau) < 6) {
+        $loiDangKy = 'Mật khẩu phải có ít nhất 6 ký tự.';
+    } elseif ($matKhau !== $matKhau2) {
+        $loiDangKy = 'Mật khẩu xác nhận không khớp.';
+    } else {
+        // Kiểm tra Email và SĐT đã tồn tại chưa (Business Rule UC02: mỗi email/SĐT chỉ 1 tài khoản)
+        $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM tai_khoan WHERE Email = :email OR SDT = :sdt");
+        $stmtCheck->bindParam(':email', $email);
+        $stmtCheck->bindParam(':sdt', $sdt);
+        $stmtCheck->execute();
+
+        if ((int)$stmtCheck->fetchColumn() > 0) {
+            $loiDangKy = 'Email hoặc số điện thoại đã được sử dụng. Vui lòng đăng nhập hoặc dùng thông tin khác.';
+        } else {
+            // Lưu mật khẩu dạng plain-text (không mã hóa) theo yêu cầu
+            $matKhauMaHoa = $matKhau;
+
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO tai_khoan (HoTen, Email, SDT, MatKhau, VaiTro)
+                VALUES (:hoTen, :email, :sdt, :matKhau, 'ThanhVien')
+            ");
+            $stmtInsert->bindParam(':hoTen', $hoTen);
+            $stmtInsert->bindParam(':email', $email);
+            $stmtInsert->bindParam(':sdt', $sdt);
+            $stmtInsert->bindParam(':matKhau', $matKhauMaHoa);
+            $stmtInsert->execute();
+
+            $maTKMoi = $pdo->lastInsertId();
+
+            // Tự động đăng nhập sau khi đăng ký thành công
+            $_SESSION['MaTK']   = $maTKMoi;
+            $_SESSION['HoTen']  = $hoTen;
+            $_SESSION['Email']  = $email;
+            $_SESSION['VaiTro'] = 'ThanhVien';
+
+            header('Location: index.php?msg=' . urlencode('Tạo tài khoản thành công! Chào mừng bạn!') . '&type=success');
+            exit;
+        }
+    }
+}
+
+$pageTitle = 'Luxury Hotel – Đăng nhập';
+require_once '../includes/head.php';
+require_once '../includes/navbar.php';
 ?>
 
-<div class="row justify-content-center my-5">
-    <div class="col-md-5">
-
-        <div class="text-center mb-4">
-            <h2 class="font-luxury fw-bold text-navy mb-1">Đăng nhập hoặc tạo tài khoản</h2>
-            <p class="text-muted small mb-0">Truy cập các dịch vụ và ưu đãi dành riêng cho thành viên Luxury Hotel</p>
-        </div>
-
-        <?php if(!empty($error)): ?>
-            <div class="alert alert-danger shadow-sm small"><?php echo $error; ?></div>
-        <?php endif; ?>
-        <?php if(!empty($success)): ?>
-            <div class="alert alert-success shadow-sm small"><?php echo $success; ?></div>
-        <?php endif; ?>
-
-        <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
-            <ul class="nav nav-pills nav-justified mb-4" id="pills-tab" role="tablist">
-                <li class="nav-item">
-                    <button class="nav-link active fw-bold" id="tab-login" data-bs-toggle="pill" data-bs-target="#pane-login" type="button">ĐĂNG NHẬP</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link fw-bold" id="tab-register" data-bs-toggle="pill" data-bs-target="#pane-register" type="button">TẠO TÀI KHOẢN</button>
-                </li>
-            </ul>
-            
-            <div class="tab-content">
-                <div class="tab-pane fade show active" id="pane-login">
-                    <form method="POST" action="auth.php">
-                        <input type="hidden" name="action" value="login">
-                        <div class="mb-3">
-                            <label class="form-label text-muted small fw-bold">Địa chỉ Email</label>
-                            <input type="email" name="email" class="form-control form-control-lg" placeholder="name@example.com" required>
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label text-muted small fw-bold">Mật khẩu</label>
-                            <input type="password" name="password" class="form-control form-control-lg" placeholder="••••••••" required>
-                        </div>
-                        <button type="submit" class="btn btn-navy text-white w-100 py-2 fw-bold rounded-pill">Tiếp tục với email</button>
-                        <div class="text-center mt-3">
-                            <a href="#" class="text-muted small text-decoration-none">Khôi phục tài khoản?</a>
-                        </div>
-                    </form>
-                </div>
-                
-                <div class="tab-pane fade" id="pane-register">
-                    <form method="POST" action="auth.php">
-                        <input type="hidden" name="action" value="register">
-                        <div class="mb-3">
-                            <label class="form-label text-muted small fw-bold">Họ và Tên</label>
-                            <input type="text" name="fullname" class="form-control" placeholder="Nguyễn Văn A" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label text-muted small fw-bold">Địa chỉ Email</label>
-                            <input type="email" name="email" class="form-control" placeholder="nguyenvana@gmail.com" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label text-muted small fw-bold">Số điện thoại</label>
-                            <input type="tel" name="phone" class="form-control" placeholder="0901234567" required>
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label text-muted small fw-bold">Mật khẩu bảo mật</label>
-                            <input type="password" name="password" class="form-control" placeholder="Tối thiểu 8 ký tự" minlength="8" required>
-                        </div>
-                        <button type="submit" class="btn btn-gold w-100 py-2 fw-bold rounded-pill">Hoàn tất đăng ký</button>
-                    </form>
-                </div>
-            </div>
-        </div>
+<div class="container">
+  <div class="auth-card bg-white border rounded p-4 p-md-5">
+    <div class="text-center mb-4">
+      <div class="font-playfair" style="color:var(--gold);letter-spacing:2px;font-size:1.3rem">LUXURY HOTEL</div>
     </div>
+
+    <ul class="nav nav-tabs mb-4 justify-content-center">
+      <li class="nav-item">
+        <a class="nav-link <?= $mode === 'login' ? 'active' : '' ?>" href="auth.php?mode=login">Đăng nhập</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link <?= $mode === 'register' ? 'active' : '' ?>" href="auth.php?mode=register">Đăng ký</a>
+      </li>
+    </ul>
+
+    <?php if ($mode === 'login'): ?>
+      <h2 class="font-playfair h4 mb-1" style="color:var(--navy)">Đăng nhập tài khoản</h2>
+      <p class="text-muted small mb-4">Đăng nhập để truy cập các dịch vụ của Luxury Hotel.</p>
+
+      <?php if ($loiDangNhap): ?><div class="alert alert-danger small">⚠ <?= h($loiDangNhap) ?></div><?php endif; ?>
+
+      <form method="POST" action="auth.php<?= !empty($_GET['redirect']) ? '?redirect=' . urlencode($_GET['redirect']) : '' ?>">
+        <input type="hidden" name="action" value="dangNhap">
+        <div class="mb-3">
+          <label class="form-label small text-uppercase text-muted">Email</label>
+          <input class="form-control" type="email" name="email" placeholder="your@email.com" required autofocus>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-uppercase text-muted">Mật khẩu</label>
+          <input class="form-control" type="password" name="matKhau" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-gold w-100 mb-2">Đăng nhập</button>
+      </form>
+      <p class="text-center small text-muted mt-3">Demo: admin@luxuryhotel.vn / Admin@123 (Admin) — tranvanan@gmail.com / KhachHang123 (Thành viên)</p>
+
+    <?php else: ?>
+      <h2 class="font-playfair h4 mb-1" style="color:var(--navy)">Tạo tài khoản mới</h2>
+      <p class="text-muted small mb-4">Hoàn tất thông tin để tạo tài khoản Luxury Hotel.</p>
+
+      <?php if ($loiDangKy): ?><div class="alert alert-danger small">⚠ <?= h($loiDangKy) ?></div><?php endif; ?>
+
+      <form method="POST" action="auth.php?mode=register">
+        <input type="hidden" name="action" value="dangKy">
+        <div class="mb-3">
+          <label class="form-label small text-uppercase text-muted">Họ và tên</label>
+          <input class="form-control" name="hoTen" placeholder="Trần Văn An" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-uppercase text-muted">Email</label>
+          <input class="form-control" type="email" name="email" value="<?= h($emailDaNhap) ?>" placeholder="email@gmail.com" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-uppercase text-muted">Số điện thoại</label>
+          <input class="form-control" name="sdt" placeholder="0912345678" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-uppercase text-muted">Mật khẩu</label>
+          <input class="form-control" type="password" name="matKhau" placeholder="Ít nhất 6 ký tự" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-uppercase text-muted">Xác nhận mật khẩu</label>
+          <input class="form-control" type="password" name="matKhau2" placeholder="Nhập lại mật khẩu" required>
+        </div>
+        <button type="submit" class="btn btn-gold w-100">Tạo tài khoản</button>
+        <p class="small text-muted text-center mt-3">Bằng cách tạo tài khoản, bạn đồng ý với <a href="#">Điều khoản dịch vụ</a> của chúng tôi.</p>
+      </form>
+    <?php endif; ?>
+  </div>
 </div>
 
-<?php include_once 'footer.php'; ?>
+<?php require_once '../includes/footer.php'; ?>

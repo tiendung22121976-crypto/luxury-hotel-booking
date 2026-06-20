@@ -1,7 +1,12 @@
 <?php
+/**
+ * logout.php
+ * -----------------------------------------------------------
+ * Hủy phiên làm việc (session) hiện tại và chuyển hướng về trang đăng nhập.
+ * -----------------------------------------------------------
+ */
 session_start();
 session_unset();
 session_destroy();
-echo "<script>window.location.href='index.php';</script>";
-exit();
-?>
+header('Location: auth.php?msg=' . urlencode('Đã đăng xuất') . '&type=default');
+exit;

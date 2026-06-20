@@ -1,89 +1,91 @@
 <?php
-require_once '../config/database.php';
+/**
+ * models/mdl_khuyen_mai.php
+ * Các hàm truy vấn CSDL cho bảng khuyen_mai (CRUD Admin + helper frontend)
+ */
+require_once __DIR__ . '/../config/database.php';
 
 function getAllKhuyenMai() {
     global $pdo;
-    $sql = "SELECT * FROM khuyen_mai ORDER BY NgayBatDau DESC";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch(PDOException $e) {
-        return [];
-    }
+        return $pdo->query("SELECT * FROM khuyen_mai ORDER BY NgayBatDau DESC")->fetchAll();
+    } catch (PDOException $e) { return []; }
+}
+
+/**
+ * Lấy danh sách khuyến mãi đang còn hiệu lực (dùng cho dropdown khi đặt phòng)
+ */
+function getKhuyenMaiConHieuLuc() {
+    global $pdo;
+    try {
+        $today = date('Y-m-d');
+        $stmt  = $pdo->prepare(
+            "SELECT * FROM khuyen_mai
+             WHERE NgayBatDau <= :today AND NgayKetThuc >= :today
+             ORDER BY PhanTramGiam DESC"
+        );
+        $stmt->execute([':today' => $today]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) { return []; }
 }
 
 function getKhuyenMaiById($maKM) {
     global $pdo;
-    $sql = "SELECT * FROM khuyen_mai WHERE MaKM = :maKM";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maKM', $maKM);
-        $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch(PDOException $e) {
-        return false;
-    }
+        $stmt = $pdo->prepare("SELECT * FROM khuyen_mai WHERE MaKM = :maKM");
+        $stmt->execute([':maKM' => $maKM]);
+        return $stmt->fetch();
+    } catch (PDOException $e) { return false; }
 }
 
 function checkKhuyenMaiExists($maKM) {
     global $pdo;
-    $sql = "SELECT COUNT(*) as count FROM khuyen_mai WHERE MaKM = :maKM";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maKM', $maKM);
-        $stmt->execute();
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row['count'] > 0;
-    } catch(PDOException $e) {
-        return false;
-    }
+        $stmt = $pdo->prepare("SELECT COUNT(*) as cnt FROM khuyen_mai WHERE MaKM = :maKM");
+        $stmt->execute([':maKM' => $maKM]);
+        return $stmt->fetch()['cnt'] > 0;
+    } catch (PDOException $e) { return false; }
 }
 
 function addKhuyenMai($maKM, $tenKM, $phanTram, $ngayBD, $ngayKT) {
     global $pdo;
-    $sql = "INSERT INTO khuyen_mai (MaKM, TenKM, PhanTramGiam, NgayBatDau, NgayKetThuc) 
-            VALUES (:maKM, :tenKM, :phanTram, :ngayBD, :ngayKT)";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maKM', $maKM);
-        $stmt->bindParam(':tenKM', $tenKM);
-        $stmt->bindParam(':phanTram', $phanTram);
-        $stmt->bindParam(':ngayBD', $ngayBD);
-        $stmt->bindParam(':ngayKT', $ngayKT);
-        return $stmt->execute();
-    } catch(PDOException $e) {
-        return false;
-    }
+        $stmt = $pdo->prepare(
+            "INSERT INTO khuyen_mai (MaKM, TenKM, PhanTramGiam, NgayBatDau, NgayKetThuc)
+             VALUES (:maKM, :tenKM, :phanTram, :ngayBD, :ngayKT)"
+        );
+        return $stmt->execute([
+            ':maKM'     => $maKM,
+            ':tenKM'    => $tenKM,
+            ':phanTram' => $phanTram,
+            ':ngayBD'   => $ngayBD,
+            ':ngayKT'   => $ngayKT,
+        ]);
+    } catch (PDOException $e) { return false; }
 }
 
 function updateKhuyenMai($maKM, $tenKM, $phanTram, $ngayBD, $ngayKT) {
     global $pdo;
-    $sql = "UPDATE khuyen_mai 
-            SET TenKM = :tenKM, PhanTramGiam = :phanTram, NgayBatDau = :ngayBD, NgayKetThuc = :ngayKT 
-            WHERE MaKM = :maKM";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maKM', $maKM);
-        $stmt->bindParam(':tenKM', $tenKM);
-        $stmt->bindParam(':phanTram', $phanTram);
-        $stmt->bindParam(':ngayBD', $ngayBD);
-        $stmt->bindParam(':ngayKT', $ngayKT);
-        return $stmt->execute();
-    } catch(PDOException $e) {
-        return false;
-    }
+        $stmt = $pdo->prepare(
+            "UPDATE khuyen_mai
+             SET TenKM = :tenKM, PhanTramGiam = :phanTram, NgayBatDau = :ngayBD, NgayKetThuc = :ngayKT
+             WHERE MaKM = :maKM"
+        );
+        return $stmt->execute([
+            ':maKM'     => $maKM,
+            ':tenKM'    => $tenKM,
+            ':phanTram' => $phanTram,
+            ':ngayBD'   => $ngayBD,
+            ':ngayKT'   => $ngayKT,
+        ]);
+    } catch (PDOException $e) { return false; }
 }
 
 function deleteKhuyenMai($maKM) {
     global $pdo;
-    $sql = "DELETE FROM khuyen_mai WHERE MaKM = :maKM";
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':maKM', $maKM);
-        return $stmt->execute();
-    } catch(PDOException $e) {
-        return false;
-    }
+        $stmt = $pdo->prepare("DELETE FROM khuyen_mai WHERE MaKM = :maKM");
+        return $stmt->execute([':maKM' => $maKM]);
+    } catch (PDOException $e) { return false; }
 }
-?>
