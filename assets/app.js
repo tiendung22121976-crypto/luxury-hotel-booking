@@ -1,6 +1,6 @@
 // ── LUXURY HOTEL – Shared client-side JS ──
 // File này chỉ chứa các helper UI thuần (toast, đếm sao...).
-// Toàn bộ logic dữ liệu (đặt phòng, đăng nhập, CRUD) đã được xử lý
+// Toàn bộ logic dữ liệu (đặt phòng, đăng  , CRUD) đã được xử lý
 // ở phía Server bằng PHP + PDO, JS chỉ hỗ trợ trải nghiệm người dùng.
 
 // Hiển thị thông báo dạng Toast (dùng Bootstrap Toast)

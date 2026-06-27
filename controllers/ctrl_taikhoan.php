@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Kiểm tra xem Email hoặc SĐT đã tồn tại chưa
-        $stmtCheck = $conn->prepare("SELECT MaTK FROM tai_khoan WHERE Email = ? OR SDT = ?");
+        $stmtCheck = $pdo->prepare("SELECT MaTK FROM tai_khoan WHERE Email = ? OR SDT = ?");
         $stmtCheck->execute([$email, $sdt]);
         if ($stmtCheck->rowCount() > 0) {
             die("Email hoặc Số điện thoại đã tồn tại trong hệ thống.");
@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $matKhauHash = password_hash($matKhau, PASSWORD_BCRYPT);
 
         // Lưu vào CSDL
-        $stmtInsert = $conn->prepare("INSERT INTO tai_khoan (HoTen, Email, SDT, MatKhau, VaiTro) VALUES (?, ?, ?, ?, 'ThanhVien')");
+        $stmtInsert = $pdo->prepare("INSERT INTO tai_khoan (HoTen, Email, SDT, MatKhau, VaiTro) VALUES (?, ?, ?, ?, 'ThanhVien')");
         if ($stmtInsert->execute([$hoTen, $email, $sdt, $matKhauHash])) {
             echo "Đăng ký thành công! Vui lòng đăng nhập.";
         } else {
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = trim($_POST['email']);
         $matKhau = trim($_POST['matKhau']);
 
-        $stmt = $conn->prepare("SELECT MaTK, HoTen, MatKhau, VaiTro FROM tai_khoan WHERE Email = ?");
+        $stmt = $pdo->prepare("SELECT MaTK, HoTen, MatKhau, VaiTro FROM tai_khoan WHERE Email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 

@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $soDem = ($timeTra - $timeNhan) / (60 * 60 * 24);
 
     // Lấy giá phòng gốc từ CSDL (Join giữa bảng phong và loai_phong)
-    $stmtGia = $conn->prepare("SELECT lp.DonGia FROM phong p JOIN loai_phong lp ON p.MaLoai = lp.MaLoai WHERE p.MaPhong = ?");
+    $stmtGia = $pdo->prepare("SELECT lp.DonGia FROM phong p JOIN loai_phong lp ON p.MaLoai = lp.MaLoai WHERE p.MaPhong = ?");
     $stmtGia->execute([$maPhong]);
     $phong = $stmtGia->fetch(PDO::FETCH_ASSOC);
     
@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     // Xử lý mã khuyến mãi nếu có
     if ($maKM) {
-        $stmtKM = $conn->prepare("SELECT PhanTramGiam FROM khuyen_mai WHERE MaKM = ? AND NgayBatDau <= CURRENT_DATE AND NgayKetThuc >= CURRENT_DATE");
+        $stmtKM = $pdo->prepare("SELECT PhanTramGiam FROM khuyen_mai WHERE MaKM = ? AND NgayBatDau <= CURRENT_DATE AND NgayKetThuc >= CURRENT_DATE");
         $stmtKM->execute([$maKM]);
         $khuyenMai = $stmtKM->fetch(PDO::FETCH_ASSOC);
 
@@ -55,24 +55,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     try {
         // Sử dụng Transaction để đảm bảo tính toàn vẹn dữ liệu
-        $conn->beginTransaction();
+        $pdo->beginTransaction();
 
         // Thêm đơn đặt phòng vào Database
-        $stmtDatPhong = $conn->prepare("INSERT INTO don_dat_phong (MaTK, MaPhong, NgayNhan, NgayTra, TongTien, MaKM, MaXacNhan, TrangThaiDon) VALUES (?, ?, ?, ?, ?, ?, ?, 'ChoXacNhan')");
+        $stmtDatPhong = $pdo->prepare("INSERT INTO don_dat_phong (MaTK, MaPhong, NgayNhan, NgayTra, TongTien, MaKM, MaXacNhan, TrangThaiDon) VALUES (?, ?, ?, ?, ?, ?, ?, 'ChoXacNhan')");
         $stmtDatPhong->execute([$maTK, $maPhong, $ngayNhan, $ngayTra, $tongTien, $maKM, $maXacNhan]);
 
         // Cập nhật trạng thái phòng thành 'Reserved'
-        $stmtCapNhatPhong = $conn->prepare("UPDATE phong SET TrangThai = 'Reserved' WHERE MaPhong = ?");
+        $stmtCapNhatPhong = $pdo->prepare("UPDATE phong SET TrangThai = 'Reserved' WHERE MaPhong = ?");
         $stmtCapNhatPhong->execute([$maPhong]);
 
         // Hoàn tất lưu
-        $conn->commit();
+        $pdo->commit();
         
         echo "Đặt phòng thành công! Mã xác nhận của bạn là: " . $maXacNhan;
 
     } catch (Exception $e) {
         // Rollback nếu có lỗi hệ thống
-        $conn->rollBack();
+        $pdo->rollBack();
         die("Hệ thống đang bận, thao tác đặt phòng chưa thành công. Vui lòng thử lại sau.");
     }
 }
