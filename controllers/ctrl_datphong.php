@@ -1,79 +1,146 @@
 <?php
+
+/**
+ * controllers/ctrl_datphong.php
+ * Controller xử lý nghiệp vụ đặt phòng (UC03)
+ */
 session_start();
 require_once '../config/database.php';
+require_once '../includes/functions.php';
+require_once '../models/mdl_phong.php';
+require_once '../models/mdl_khuyen_mai.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'datphong') {
-    // Kiểm tra đăng nhập
-    if (!isset($_SESSION['maTK'])) {
-        die("Vui lòng đăng nhập để thực hiện đặt phòng!");
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'datPhong') {
+
+    $maPhong       = trim($_POST['maPhong'] ?? '');
+    $ngayNhan      = trim($_POST['ngayNhan'] ?? '');
+    $ngayTra       = trim($_POST['ngayTra'] ?? '');
+    $hoTenNguoiDat = trim($_POST['hoTen'] ?? (trim($_POST['ten'] ?? '') . ' ' . trim($_POST['ho'] ?? '')));
+    $emailNguoiDat = trim($_POST['email'] ?? '');
+    $sdtNguoiDat   = trim($_POST['sdt'] ?? '');
+    $yeuCauDacBiet = trim($_POST['yeuCauDacBiet'] ?? '');
+    $maKM          = trim($_POST['maKM'] ?? '');
+
+    if ($maPhong === '') {
+        header('Location: ../views/search.php');
+        exit;
     }
 
-    // Lấy dữ liệu theo chuẩn camelCase
-    $maTK = $_SESSION['maTK'];
-    $maPhong = $_POST['maPhong'];
-    $ngayNhan = $_POST['ngayNhan'];
-    $ngayTra = $_POST['ngayTra'];
-    $maKM = !empty($_POST['maKM']) ? $_POST['maKM'] : null;
-
-    // Tính số đêm lưu trú
-    $timeNhan = strtotime($ngayNhan);
-    $timeTra = strtotime($ngayTra);
-    if ($timeTra <= $timeNhan) {
-        die("Ngày trả phòng phải sau ngày nhận phòng.");
+    // 1. Validate dữ liệu đầu vào cơ bản
+    if (!$ngayNhan || !$ngayTra) {
+        header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&err=" . urlencode("Vui lòng chọn ngày nhận và trả phòng."));
+        exit;
     }
-    $soDem = ($timeTra - $timeNhan) / (60 * 60 * 24);
+    if (strtotime($ngayTra) <= strtotime($ngayNhan)) {
+        header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&err=" . urlencode("Ngày trả phải sau ngày nhận phòng."));
+        exit;
+    }
+    if (strtotime($ngayNhan) < strtotime(date('Y-m-d'))) {
+        header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&err=" . urlencode("Ngày nhận phòng không thể là ngày trong quá khứ."));
+        exit;
+    }
+    if (!$hoTenNguoiDat || !$emailNguoiDat || !$sdtNguoiDat) {
+        header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&err=" . urlencode("Vui lòng điền đầy đủ thông tin người đặt."));
+        exit;
+    }
 
-    // Lấy giá phòng gốc từ CSDL (Join giữa bảng phong và loai_phong)
-    $stmtGia = $pdo->prepare("SELECT lp.DonGia FROM phong p JOIN loai_phong lp ON p.MaLoai = lp.MaLoai WHERE p.MaPhong = ?");
-    $stmtGia->execute([$maPhong]);
-    $phong = $stmtGia->fetch(PDO::FETCH_ASSOC);
-    
+    // 2. Lấy thông tin đơn giá và địa chỉ phòng từ CSDL
+    $stmtP = $pdo->prepare("
+        SELECT p.MaPhong, lp.DonGia, ks.DiaChi 
+        FROM phong p 
+        INNER JOIN loai_phong lp ON p.MaLoai = lp.MaLoai 
+        INNER JOIN khach_san ks ON p.MaKS = ks.MaKS 
+        WHERE p.MaPhong = :maPhong LIMIT 1
+    ");
+    $stmtP->execute([':maPhong' => $maPhong]);
+    $phong = $stmtP->fetch();
+
     if (!$phong) {
-        die("Phòng không tồn tại.");
+        header('Location: ../views/search.php');
+        exit;
     }
 
-    $donGia = $phong['DonGia'];
-    $tienPhong = $soDem * $donGia;
-    $tongTien = $tienPhong;
+    // 3. Kiểm tra xung đột phòng lần cuối (chống trùng lịch khi 2 người đặt cùng lúc)
+    $stmtCheck = $pdo->prepare("
+        SELECT COUNT(*) FROM don_dat_phong
+        WHERE MaPhong = :maPhong AND TrangThaiDon != 'DaHuy'
+          AND NgayNhan < :ngayTra AND NgayTra > :ngayNhan
+    ");
+    $stmtCheck->execute([
+        ':maPhong'  => $maPhong,
+        ':ngayNhan' => $ngayNhan,
+        ':ngayTra'  => $ngayTra
+    ]);
 
-    // Xử lý mã khuyến mãi nếu có
-    if ($maKM) {
-        $stmtKM = $pdo->prepare("SELECT PhanTramGiam FROM khuyen_mai WHERE MaKM = ? AND NgayBatDau <= CURRENT_DATE AND NgayKetThuc >= CURRENT_DATE");
-        $stmtKM->execute([$maKM]);
-        $khuyenMai = $stmtKM->fetch(PDO::FETCH_ASSOC);
+    if ((int)$stmtCheck->fetchColumn() > 0) {
+        header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&err=CONFLICT");
+        exit;
+    }
 
-        if ($khuyenMai) {
-            $tienKhuyenMai = $tienPhong * ($khuyenMai['PhanTramGiam'] / 100);
-            $tongTien = $tienPhong - $tienKhuyenMai;
-        } else {
-            die("Mã khuyến mãi không tồn tại hoặc đã hết hạn.");
+    // 4. Tính toán tài chính
+    $soDem     = tinhSoDem($ngayNhan, $ngayTra);
+    $tienPhong = $phong['DonGia'] * $soDem;
+
+    $phanTramGiam = 0;
+    $maKMHopLe    = null;
+    if ($maKM !== '') {
+        $stmtKM = $pdo->prepare("
+            SELECT MaKM, PhanTramGiam FROM khuyen_mai
+            WHERE MaKM = :maKM AND CURDATE() BETWEEN NgayBatDau AND NgayKetThuc
+        ");
+        $stmtKM->execute([':maKM' => $maKM]);
+        $km = $stmtKM->fetch();
+        if ($km) {
+            $phanTramGiam = (int)$km['PhanTramGiam'];
+            $maKMHopLe    = $km['MaKM'];
         }
     }
+    $tongThanhToan = round($tienPhong * (1 - $phanTramGiam / 100));
 
-    // Sinh mã xác nhận đặt phòng duy nhất
-    $maXacNhan = 'LH' . strtoupper(substr(uniqid(), -6));
+    // 5. Sinh mã xác nhận đặt phòng duy nhất
+    $maTinh = strpos($phong['DiaChi'], 'Đà Nẵng') !== false ? 'DA'
+        : (strpos($phong['DiaChi'], 'Hồ Chí Minh') !== false ? 'SG' : 'HN');
+    do {
+        $maXacNhanMoi = sinhMaXacNhan($maTinh);
+        $stmtTrung = $pdo->prepare("SELECT COUNT(*) FROM don_dat_phong WHERE MaXacNhan = :ma");
+        $stmtTrung->execute([':ma' => $maXacNhanMoi]);
+    } while ((int)$stmtTrung->fetchColumn() > 0);
 
+    // 6. Ghi vào CSDL bằng Transaction
     try {
-        // Sử dụng Transaction để đảm bảo tính toàn vẹn dữ liệu
         $pdo->beginTransaction();
 
-        // Thêm đơn đặt phòng vào Database
-        $stmtDatPhong = $pdo->prepare("INSERT INTO don_dat_phong (MaTK, MaPhong, NgayNhan, NgayTra, TongTien, MaKM, MaXacNhan, TrangThaiDon) VALUES (?, ?, ?, ?, ?, ?, ?, 'ChoXacNhan')");
-        $stmtDatPhong->execute([$maTK, $maPhong, $ngayNhan, $ngayTra, $tongTien, $maKM, $maXacNhan]);
+        $stmtInsert = $pdo->prepare("
+            INSERT INTO don_dat_phong (MaTK, MaPhong, NgayNhan, NgayTra, TongTien, MaKM, MaXacNhan, TrangThaiDon)
+            VALUES (:maTK, :maPhong, :ngayNhan, :ngayTra, :tongTien, :maKM, :maXacNhan, 'DaXacNhan')
+        ");
+        $maTKInsert = daDangNhap() ? ($_SESSION['MaTK'] ?? null) : null;
+        $stmtInsert->bindValue(':maTK', $maTKInsert, $maTKInsert === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmtInsert->execute([
+            ':maPhong'   => $maPhong,
+            ':ngayNhan'  => $ngayNhan,
+            ':ngayTra'   => $ngayTra,
+            ':tongTien'  => $tongThanhToan,
+            ':maKM'      => $maKMHopLe,
+            ':maXacNhan' => $maXacNhanMoi
+        ]);
 
-        // Cập nhật trạng thái phòng thành 'Reserved'
-        $stmtCapNhatPhong = $pdo->prepare("UPDATE phong SET TrangThai = 'Reserved' WHERE MaPhong = ?");
-        $stmtCapNhatPhong->execute([$maPhong]);
+        if ($ngayNhan <= date('Y-m-d')) {
+            $pdo->prepare("UPDATE phong SET TrangThai = 'Reserved' WHERE MaPhong = :maPhong")
+                ->execute([':maPhong' => $maPhong]);
+        }
 
-        // Hoàn tất lưu
         $pdo->commit();
-        
-        echo "Đặt phòng thành công! Mã xác nhận của bạn là: " . $maXacNhan;
 
-    } catch (Exception $e) {
-        // Rollback nếu có lỗi hệ thống
+        // Thành công -> Bắt hướng trở lại trang chi tiết kèm mã xác nhận
+        header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&res_code=" . urlencode($maXacNhanMoi));
+        exit;
+    } catch (PDOException $e) {
         $pdo->rollBack();
-        die("Hệ thống đang bận, thao tác đặt phòng chưa thành công. Vui lòng thử lại sau.");
+        header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&err=" . urlencode("Hệ thống đang bận, thao tác đặt phòng chưa thành công. Vui lòng thử lại sau."));
+        exit;
     }
+} else {
+    header('Location: ../views/search.php');
+    exit;
 }
-?>

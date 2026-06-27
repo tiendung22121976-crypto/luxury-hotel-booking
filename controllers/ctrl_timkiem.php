@@ -12,9 +12,9 @@ $errTimKiem = '';
 
 if (isset($_GET['btn_timkiem'])) {
     $daTimKiem = true;
-    $diaDiem  = trim($_GET['diadiem']  ?? '');
-    $ngayNhan = trim($_GET['checkin']  ?? '');
-    $ngayTra  = trim($_GET['checkout'] ?? '');
+    $diaDiem  = trim($_GET['diaDiem']  ?? '');
+    $ngayNhan = trim($_GET['ngayNhan']  ?? '');
+    $ngayTra  = trim($_GET['ngayTra'] ?? '');
 
     if (empty($diaDiem) || empty($ngayNhan) || empty($ngayTra)) {
         $errTimKiem = 'Vui lòng nhập đầy đủ thông tin tìm kiếm.';

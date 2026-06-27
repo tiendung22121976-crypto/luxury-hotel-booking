@@ -2,16 +2,7 @@
 
 /**
  * room-detail.php
- * -----------------------------------------------------------
- * Trang Chi tiết phòng (UC01 mở rộng + UC03: Đặt phòng + UC04: Đánh giá)
- * Chức năng:
- *  - Nhận MaPhong qua GET (?id=...), truy vấn đầy đủ thông tin phòng.
- *  - Hiển thị danh sách đánh giá (bảng danh_gia) JOIN với tai_khoan
- *    và don_dat_phong để lấy tên người đánh giá và mã đặt phòng liên quan.
- *  - Xử lý form đặt phòng (POST) -> kiểm tra lại tình trạng phòng lần
- *    cuối (chống xung đột khi 2 người đặt cùng lúc) -> INSERT vào
- *    don_dat_phong -> sinh mã xác nhận duy nhất.
- * -----------------------------------------------------------
+ * Trang Chi tiết phòng (View thuần)
  */
 session_start();
 require_once '../config/database.php';
@@ -19,7 +10,7 @@ require_once '../includes/functions.php';
 require_once '../models/mdl_phong.php';
 require_once '../models/mdl_khuyen_mai.php';
 
-$maPhong = trim($_GET['id'] ?? '');
+$maPhong       = trim($_GET['id'] ?? '');
 $ngayNhanQuery = trim($_GET['ngayNhan'] ?? '');
 $ngayTraQuery  = trim($_GET['ngayTra'] ?? '');
 
@@ -27,6 +18,10 @@ if ($maPhong === '') {
   header('Location: search.php');
   exit;
 }
+
+// Hứng kết quả từ Controller chuyển hướng về
+$thongBaoLoi       = trim($_GET['err'] ?? '');
+$thongBaoThanhCong = trim($_GET['res_code'] ?? '');
 
 // ── Truy vấn thông tin chi tiết phòng (JOIN 3 bảng) ──
 $stmt = $pdo->prepare("
@@ -48,12 +43,10 @@ if (!$phong) {
   exit;
 }
 
-$soSao = maLoaiSangSoSao($phong['TenLoai']);
+$soSao     = maLoaiSangSoSao($phong['TenLoai']);
 $dsTienIch = tachTienIch($phong['TienIch']);
 
 // ── Truy vấn danh sách đánh giá của phòng này ──
-// Đánh giá gắn với đơn đặt phòng (MaDon), đơn đặt phòng gắn với phòng (MaPhong)
-// nên cần JOIN qua don_dat_phong để lọc đánh giá đúng theo phòng đang xem.
 $stmtDG = $pdo->prepare("
     SELECT dg.MaDG, dg.MucDo, dg.BinhLuan, dg.NgayDanhGia, tk.HoTen
     FROM danh_gia dg
@@ -66,9 +59,7 @@ $stmtDG->bindParam(':maPhong', $maPhong);
 $stmtDG->execute();
 $dsDanhGia = $stmtDG->fetchAll();
 
-// ── Kiểm tra tài khoản đang đăng nhập có đơn đặt phòng đã HoanTat tại
-//    phòng này (để được phép viết đánh giá) hay không, theo Business Rule
-//    của UC04 (chỉ khách đã từng lưu trú & trả phòng mới được đánh giá) ──
+// ── Kiểm tra tài khoản đang đăng nhập có đơn đặt phòng đã HoanTat tại phòng này không ──
 $donDuDieuKienDanhGia = null;
 if (daDangNhap()) {
   $stmtKT = $pdo->prepare("
@@ -84,121 +75,11 @@ if (daDangNhap()) {
   $donDuDieuKienDanhGia = $stmtKT->fetchColumn();
 }
 
-$thongBaoLoi = '';
-$thongBaoThanhCong = '';
-$maXacNhanMoi = '';
-
-// ── XỬ LÝ FORM ĐẶT PHÒNG (UC03) ── (hỗ trợ cả khách vãng lai)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'datPhong') {
-
-  $ngayNhan = trim($_POST['ngayNhan'] ?? '');
-  $ngayTra  = trim($_POST['ngayTra'] ?? '');
-  // Ghép từ field ten + ho (form mới) hoặc hoTen (form cũ)
-  $hoTenNguoiDat = trim($_POST['hoTen'] ?? (trim($_POST['ten'] ?? '') . ' ' . trim($_POST['ho'] ?? '')));
-  $emailNguoiDat = trim($_POST['email'] ?? '');
-  $sdtNguoiDat   = trim($_POST['sdt'] ?? '');
-  $yeuCauDacBiet = trim($_POST['yeuCauDacBiet'] ?? '');
-  $maKM = trim($_POST['maKM'] ?? '');
-
-  // Validate dữ liệu đầu vào
-  if (!$ngayNhan || !$ngayTra) {
-    $thongBaoLoi = 'Vui lòng chọn ngày nhận và trả phòng.';
-  } elseif (strtotime($ngayTra) <= strtotime($ngayNhan)) {
-    $thongBaoLoi = 'Ngày trả phải sau ngày nhận phòng.';
-  } elseif (strtotime($ngayNhan) < strtotime(date('Y-m-d'))) {
-    $thongBaoLoi = 'Ngày nhận phòng không thể là ngày trong quá khứ.';
-  } elseif (!$hoTenNguoiDat || !$emailNguoiDat || !$sdtNguoiDat) {
-    $thongBaoLoi = 'Vui lòng điền đầy đủ thông tin người đặt.';
-  } else {
-    // ── KIỂM TRA TÌNH TRẠNG PHÒNG LẦN CUỐI (chống xung đột đặt trùng) ──
-    // Dùng lại sub-query NOT EXISTS tương tự trang search.php để đảm bảo
-    // tính nhất quán dữ liệu ngay trước khi ghi đơn (Exception Flow UC03: 4a).
-    $stmtCheck = $pdo->prepare("
-            SELECT COUNT(*) FROM don_dat_phong
-            WHERE MaPhong = :maPhong AND TrangThaiDon != 'DaHuy'
-              AND NgayNhan < :ngayTra AND NgayTra > :ngayNhan
-        ");
-    $stmtCheck->bindParam(':maPhong', $maPhong);
-    $stmtCheck->bindParam(':ngayNhan', $ngayNhan);
-    $stmtCheck->bindParam(':ngayTra', $ngayTra);
-    $stmtCheck->execute();
-    $coXungDot = (int)$stmtCheck->fetchColumn() > 0;
-
-    if ($coXungDot) {
-      $thongBaoLoi = 'CONFLICT'; // Cờ đặc biệt để hiển thị modal xung đột phòng
-    } else {
-      // ── Tính tổng tiền theo công thức: (Đơn giá * Số đêm) - Khuyến mãi ──
-      $soDem = tinhSoDem($ngayNhan, $ngayTra);
-      $tienPhong = $phong['DonGia'] * $soDem;
-
-      $phanTramGiam = 0;
-      $maKMHopLe = null;
-      if ($maKM !== '') {
-        $stmtKM = $pdo->prepare("
-                    SELECT MaKM, PhanTramGiam FROM khuyen_mai
-                    WHERE MaKM = :maKM AND CURDATE() BETWEEN NgayBatDau AND NgayKetThuc
-                ");
-        $stmtKM->bindParam(':maKM', $maKM);
-        $stmtKM->execute();
-        $km = $stmtKM->fetch();
-        if ($km) {
-          $phanTramGiam = (int)$km['PhanTramGiam'];
-          $maKMHopLe = $km['MaKM'];
-        }
-      }
-      $tongThanhToan = round($tienPhong * (1 - $phanTramGiam / 100));
-
-      // ── Sinh mã xác nhận DUY NHẤT (kiểm tra lặp với UNIQUE KEY trong CSDL) ──
-      $maTinh = strpos($phong['DiaChi'], 'Đà Nẵng') !== false ? 'DA'
-        : (strpos($phong['DiaChi'], 'Hồ Chí Minh') !== false ? 'SG' : 'HN');
-      do {
-        $maXacNhanMoi = sinhMaXacNhan($maTinh);
-        $stmtTrung = $pdo->prepare("SELECT COUNT(*) FROM don_dat_phong WHERE MaXacNhan = :ma");
-        $stmtTrung->bindParam(':ma', $maXacNhanMoi);
-        $stmtTrung->execute();
-      } while ((int)$stmtTrung->fetchColumn() > 0);
-
-      try {
-        // Dùng Transaction để đảm bảo tính toàn vẹn dữ liệu (ghi đơn + cập nhật trạng thái phòng)
-        $pdo->beginTransaction();
-
-        $stmtInsert = $pdo->prepare("
-                    INSERT INTO don_dat_phong (MaTK, MaPhong, NgayNhan, NgayTra, TongTien, MaKM, MaXacNhan, TrangThaiDon)
-                    VALUES (:maTK, :maPhong, :ngayNhan, :ngayTra, :tongTien, :maKM, :maXacNhan, 'DaXacNhan')
-                ");
-        $maTKInsert = daDangNhap() ? $_SESSION['MaTK'] : null;
-        $stmtInsert->bindValue(':maTK', $maTKInsert, $maTKInsert === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-        $stmtInsert->bindParam(':maPhong', $maPhong);
-        $stmtInsert->bindParam(':ngayNhan', $ngayNhan);
-        $stmtInsert->bindParam(':ngayTra', $ngayTra);
-        $stmtInsert->bindParam(':tongTien', $tongThanhToan);
-        $stmtInsert->bindParam(':maKM', $maKMHopLe);
-        $stmtInsert->bindParam(':maXacNhan', $maXacNhanMoi);
-        $stmtInsert->execute();
-
-        // Cập nhật trạng thái phòng sang "Reserved" nếu ngày nhận là hôm nay
-        // (Trong thực tế trạng thái phòng phụ thuộc vào lịch hiện tại; ở đây
-        // cập nhật đơn giản để đồng bộ giao diện quản trị)
-        if ($ngayNhan <= date('Y-m-d')) {
-          $pdo->prepare("UPDATE phong SET TrangThai = 'Reserved' WHERE MaPhong = :maPhong")
-            ->execute([':maPhong' => $maPhong]);
-        }
-
-        $pdo->commit();
-        $thongBaoThanhCong = $maXacNhanMoi;
-      } catch (PDOException $e) {
-        $pdo->rollBack();
-        $thongBaoLoi = 'Hệ thống đang bận, thao tác đặt phòng chưa thành công. Vui lòng thử lại sau.';
-      }
-    }
-  }
-}
-
 // ── XỬ LÝ FORM GỬI ĐÁNH GIÁ (UC04) ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'guiDanhGia') {
   yeuCauDangNhap();
-  $maDon = trim($_POST['maDon'] ?? '');
-  $mucDo = (int)($_POST['mucDo'] ?? 0);
+  $maDon    = trim($_POST['maDon'] ?? '');
+  $mucDo    = (int)($_POST['mucDo'] ?? 0);
   $binhLuan = trim($_POST['binhLuan'] ?? '');
 
   if (!$maDon || $mucDo < 1 || $mucDo > 3 || $binhLuan === '') {
@@ -207,11 +88,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $stmtInsertDG = $pdo->prepare("
             INSERT INTO danh_gia (MaTK, MaDon, MucDo, BinhLuan) VALUES (:maTK, :maDon, :mucDo, :binhLuan)
         ");
-    $stmtInsertDG->bindParam(':maTK', $_SESSION['MaTK']);
-    $stmtInsertDG->bindParam(':maDon', $maDon);
-    $stmtInsertDG->bindParam(':mucDo', $mucDo, PDO::PARAM_INT);
-    $stmtInsertDG->bindParam(':binhLuan', $binhLuan);
-    $stmtInsertDG->execute();
+    $stmtInsertDG->execute([
+      ':maTK'     => $_SESSION['MaTK'],
+      ':maDon'    => $maDon,
+      ':mucDo'    => $mucDo,
+      ':binhLuan' => $binhLuan
+    ]);
 
     header('Location: room-detail.php?id=' . urlencode($maPhong) . '&msg=' . urlencode('Cảm ơn bạn đã đánh giá!') . '&type=success');
     exit;

@@ -1,61 +1,78 @@
 <?php
 session_start();
-// Giả định file kết nối CSDL sử dụng PDO biến $conn
-require_once '../config/database.php'; 
+require_once '../config/database.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = isset($_POST['action']) ? $_POST['action'] : '';
+    $action = $_POST['action'] ?? '';
 
     // ================= XỬ LÝ ĐĂNG KÝ =================
-    if ($action === 'register') {
-        $hoTen = trim($_POST['hoTen']);
-        $email = trim($_POST['email']);
-        $sdt = trim($_POST['sdt']);
-        $matKhau = $_POST['matKhau'];
+    if ($action === 'dangKy') {
+        $hoTen    = trim($_POST['hoTen'] ?? '');
+        $email    = trim($_POST['email'] ?? '');
+        $sdt      = trim($_POST['sdt'] ?? '');
+        $matKhau  = $_POST['matKhau'] ?? '';
+        $matKhau2 = $_POST['matKhau2'] ?? '';
 
-        // Kiểm tra mật khẩu >= 6 ký tự
-        if (strlen($matKhau) < 6) {
-            die("Mật khẩu phải từ 6 ký tự trở lên.");
+        if (!$hoTen || !$email || !$sdt || !$matKhau) {
+            header('Location: ../views/auth.php?mode=register&err=' . urlencode('Vui lòng nhập đầy đủ thông tin'));
+            exit;
+        }
+        if ($matKhau !== $matKhau2) {
+            header('Location: ../views/auth.php?mode=register&err=' . urlencode('Mật khẩu xác nhận không khớp'));
+            exit;
         }
 
-        // Kiểm tra xem Email hoặc SĐT đã tồn tại chưa
-        $stmtCheck = $pdo->prepare("SELECT MaTK FROM tai_khoan WHERE Email = ? OR SDT = ?");
+        // Kiểm tra trùng lặp bằng $pdo
+        $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM tai_khoan WHERE Email = ? OR SDT = ?");
         $stmtCheck->execute([$email, $sdt]);
-        if ($stmtCheck->rowCount() > 0) {
-            die("Email hoặc Số điện thoại đã tồn tại trong hệ thống.");
+        if ($stmtCheck->fetchColumn() > 0) {
+            header('Location: ../views/auth.php?mode=register&err=' . urlencode('Email hoặc SĐT đã tồn tại'));
+            exit;
         }
 
-        // Mã hóa mật khẩu
+        // Mã hóa mật khẩu chuẩn Bcrypt
         $matKhauHash = password_hash($matKhau, PASSWORD_BCRYPT);
 
-        // Lưu vào CSDL
         $stmtInsert = $pdo->prepare("INSERT INTO tai_khoan (HoTen, Email, SDT, MatKhau, VaiTro) VALUES (?, ?, ?, ?, 'ThanhVien')");
         if ($stmtInsert->execute([$hoTen, $email, $sdt, $matKhauHash])) {
-            echo "Đăng ký thành công! Vui lòng đăng nhập.";
-        } else {
-            echo "Có lỗi xảy ra trong quá trình đăng ký.";
+            $maMoi = $pdo->lastInsertId();
+            $_SESSION['MaTK']   = $maMoi;
+            $_SESSION['HoTen']  = $hoTen;
+            $_SESSION['Email']  = $email;
+            $_SESSION['VaiTro'] = 'ThanhVien';
+            header('Location: ../views/index.php?msg=' . urlencode('Đăng ký thành công!'));
+            exit;
         }
-    } 
+    }
     // ================= XỬ LÝ ĐĂNG NHẬP =================
-    elseif ($action === 'login') {
-        $email = trim($_POST['email']);
-        $matKhau = trim($_POST['matKhau']);
+    elseif ($action === 'dangNhap') {
+        $email   = trim($_POST['email'] ?? '');
+        $matKhau = $_POST['matKhau'] ?? '';
 
-        $stmt = $pdo->prepare("SELECT MaTK, HoTen, MatKhau, VaiTro FROM tai_khoan WHERE Email = ?");
+        $stmt = $pdo->prepare("SELECT MaTK, HoTen, Email, MatKhau, VaiTro FROM tai_khoan WHERE Email = ? LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Kiểm tra mật khẩu đã hash
-        if ($user && password_verify($matKhau, $user['MatKhau'])) {
-            // Lưu thông tin vào Session
-            $_SESSION['maTK'] = $user['MaTK'];
-            $_SESSION['hoTen'] = $user['HoTen'];
-            $_SESSION['vaiTro'] = $user['VaiTro'];
-            
-            echo "Đăng nhập thành công!";
+        // Kiểm tra mật khẩu (hỗ trợ cả mật khẩu băm Bcrypt lẫn mật khẩu thô cũ)
+        $passDung = false;
+        if ($user) {
+            if (password_verify($matKhau, $user['MatKhau']) || $matKhau === $user['MatKhau']) {
+                $passDung = true;
+            }
+        }
+
+        if ($passDung) {
+            $_SESSION['MaTK']   = $user['MaTK'];
+            $_SESSION['HoTen']  = $user['HoTen'];
+            $_SESSION['Email']  = $user['Email'];
+            $_SESSION['VaiTro'] = $user['VaiTro'];
+
+            $url = ($user['VaiTro'] === 'Admin') ? '../views/admin.php' : '../views/index.php';
+            header('Location: ' . $url);
+            exit;
         } else {
-            echo "Email hoặc mật khẩu không chính xác!";
+            header('Location: ../views/auth.php?mode=login&err=' . urlencode('Email hoặc mật khẩu sai'));
+            exit;
         }
     }
 }
-?>

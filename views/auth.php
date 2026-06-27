@@ -1,4 +1,5 @@
 <?php
+
 /**
  * auth.php
  * -----------------------------------------------------------
@@ -16,8 +17,8 @@ require_once '../includes/functions.php';
 
 // Nếu đã đăng nhập rồi thì không cần vào trang này nữa
 if (daDangNhap()) {
-    header('Location: ' . (laAdmin() ? 'admin.php' : 'index.php'));
-    exit;
+  header('Location: ' . (laAdmin() ? 'admin.php' : 'index.php'));
+  exit;
 }
 
 $mode = ($_GET['mode'] ?? '') === 'register' ? 'register' : 'login';
@@ -27,87 +28,87 @@ $emailDaNhap = '';
 
 // ── XỬ LÝ ĐĂNG NHẬP ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dangNhap') {
-    $email = trim($_POST['email'] ?? '');
-    $matKhau = $_POST['matKhau'] ?? '';
+  $email = trim($_POST['email'] ?? '');
+  $matKhau = $_POST['matKhau'] ?? '';
 
-    if (!$email || !$matKhau) {
-        $loiDangNhap = 'Vui lòng nhập đầy đủ email và mật khẩu.';
+  if (!$email || !$matKhau) {
+    $loiDangNhap = 'Vui lòng nhập đầy đủ email và mật khẩu.';
+  } else {
+    $stmt = $pdo->prepare("SELECT MaTK, HoTen, Email, MatKhau, VaiTro FROM tai_khoan WHERE Email = :email LIMIT 1");
+    $stmt->bindParam(':email', $email);
+    $stmt->execute();
+    $taiKhoan = $stmt->fetch();
+
+    if (!$taiKhoan || $matKhau !== $taiKhoan['MatKhau']) {
+      $loiDangNhap = 'Email hoặc mật khẩu không chính xác.';
     } else {
-        $stmt = $pdo->prepare("SELECT MaTK, HoTen, Email, MatKhau, VaiTro FROM tai_khoan WHERE Email = :email LIMIT 1");
-        $stmt->bindParam(':email', $email);
-        $stmt->execute();
-        $taiKhoan = $stmt->fetch();
+      // Lưu thông tin phiên làm việc
+      $_SESSION['MaTK']   = $taiKhoan['MaTK'];
+      $_SESSION['HoTen']  = $taiKhoan['HoTen'];
+      $_SESSION['Email']  = $taiKhoan['Email'];
+      $_SESSION['VaiTro'] = $taiKhoan['VaiTro'];
 
-        if (!$taiKhoan || $matKhau !== $taiKhoan['MatKhau']) {
-            $loiDangNhap = 'Email hoặc mật khẩu không chính xác.';
-        } else {
-            // Lưu thông tin phiên làm việc
-            $_SESSION['MaTK']   = $taiKhoan['MaTK'];
-            $_SESSION['HoTen']  = $taiKhoan['HoTen'];
-            $_SESSION['Email']  = $taiKhoan['Email'];
-            $_SESSION['VaiTro'] = $taiKhoan['VaiTro'];
-
-            $diaChiChuyenHuong = $taiKhoan['VaiTro'] === 'Admin' ? 'admin.php' : 'index.php';
-            if (!empty($_GET['redirect'])) $diaChiChuyenHuong = $_GET['redirect'];
-            header('Location: ' . $diaChiChuyenHuong . (strpos($diaChiChuyenHuong, '?') === false ? '?' : '&') . 'msg=' . urlencode('Đăng nhập thành công!') . '&type=success');
-            exit;
-        }
+      $diaChiChuyenHuong = $taiKhoan['VaiTro'] === 'Admin' ? 'admin.php' : 'index.php';
+      if (!empty($_GET['redirect'])) $diaChiChuyenHuong = $_GET['redirect'];
+      header('Location: ' . $diaChiChuyenHuong . (strpos($diaChiChuyenHuong, '?') === false ? '?' : '&') . 'msg=' . urlencode('Đăng nhập thành công!') . '&type=success');
+      exit;
     }
+  }
 }
 
 // ── XỬ LÝ ĐĂNG KÝ ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dangKy') {
-    $mode = 'register';
-    $hoTen   = trim($_POST['hoTen'] ?? '');
-    $email   = trim($_POST['email'] ?? '');
-    $sdt     = trim($_POST['sdt'] ?? '');
-    $matKhau = $_POST['matKhau'] ?? '';
-    $matKhau2 = $_POST['matKhau2'] ?? '';
-    $emailDaNhap = $email;
+  $mode = 'register';
+  $hoTen   = trim($_POST['hoTen'] ?? '');
+  $email   = trim($_POST['email'] ?? '');
+  $sdt     = trim($_POST['sdt'] ?? '');
+  $matKhau = $_POST['matKhau'] ?? '';
+  $matKhau2 = $_POST['matKhau2'] ?? '';
+  $emailDaNhap = $email;
 
-    if (!$hoTen || !$email || !$sdt) {
-        $loiDangKy = 'Vui lòng nhập đầy đủ họ tên, email và số điện thoại.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $loiDangKy = 'Email không hợp lệ.';
-    } elseif (strlen($matKhau) < 6) {
-        $loiDangKy = 'Mật khẩu phải có ít nhất 6 ký tự.';
-    } elseif ($matKhau !== $matKhau2) {
-        $loiDangKy = 'Mật khẩu xác nhận không khớp.';
+  if (!$hoTen || !$email || !$sdt) {
+    $loiDangKy = 'Vui lòng nhập đầy đủ họ tên, email và số điện thoại.';
+  } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $loiDangKy = 'Email không hợp lệ.';
+  } elseif (strlen($matKhau) < 6) {
+    $loiDangKy = 'Mật khẩu phải có ít nhất 6 ký tự.';
+  } elseif ($matKhau !== $matKhau2) {
+    $loiDangKy = 'Mật khẩu xác nhận không khớp.';
+  } else {
+    // Kiểm tra Email và SĐT đã tồn tại chưa (Business Rule UC02: mỗi email/SĐT chỉ 1 tài khoản)
+    $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM tai_khoan WHERE Email = :email OR SDT = :sdt");
+    $stmtCheck->bindParam(':email', $email);
+    $stmtCheck->bindParam(':sdt', $sdt);
+    $stmtCheck->execute();
+
+    if ((int)$stmtCheck->fetchColumn() > 0) {
+      $loiDangKy = 'Email hoặc số điện thoại đã được sử dụng. Vui lòng đăng nhập hoặc dùng thông tin khác.';
     } else {
-        // Kiểm tra Email và SĐT đã tồn tại chưa (Business Rule UC02: mỗi email/SĐT chỉ 1 tài khoản)
-        $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM tai_khoan WHERE Email = :email OR SDT = :sdt");
-        $stmtCheck->bindParam(':email', $email);
-        $stmtCheck->bindParam(':sdt', $sdt);
-        $stmtCheck->execute();
+      // Lưu mật khẩu dạng plain-text (không mã hóa) theo yêu cầu
+      $matKhauMaHoa = $matKhau;
 
-        if ((int)$stmtCheck->fetchColumn() > 0) {
-            $loiDangKy = 'Email hoặc số điện thoại đã được sử dụng. Vui lòng đăng nhập hoặc dùng thông tin khác.';
-        } else {
-            // Lưu mật khẩu dạng plain-text (không mã hóa) theo yêu cầu
-            $matKhauMaHoa = $matKhau;
-
-            $stmtInsert = $pdo->prepare("
+      $stmtInsert = $pdo->prepare("
                 INSERT INTO tai_khoan (HoTen, Email, SDT, MatKhau, VaiTro)
                 VALUES (:hoTen, :email, :sdt, :matKhau, 'ThanhVien')
             ");
-            $stmtInsert->bindParam(':hoTen', $hoTen);
-            $stmtInsert->bindParam(':email', $email);
-            $stmtInsert->bindParam(':sdt', $sdt);
-            $stmtInsert->bindParam(':matKhau', $matKhauMaHoa);
-            $stmtInsert->execute();
+      $stmtInsert->bindParam(':hoTen', $hoTen);
+      $stmtInsert->bindParam(':email', $email);
+      $stmtInsert->bindParam(':sdt', $sdt);
+      $stmtInsert->bindParam(':matKhau', $matKhauMaHoa);
+      $stmtInsert->execute();
 
-            $maTKMoi = $pdo->lastInsertId();
+      $maTKMoi = $pdo->lastInsertId();
 
-            // Tự động đăng nhập sau khi đăng ký thành công
-            $_SESSION['MaTK']   = $maTKMoi;
-            $_SESSION['HoTen']  = $hoTen;
-            $_SESSION['Email']  = $email;
-            $_SESSION['VaiTro'] = 'ThanhVien';
+      // Tự động đăng nhập sau khi đăng ký thành công
+      $_SESSION['MaTK']   = $maTKMoi;
+      $_SESSION['HoTen']  = $hoTen;
+      $_SESSION['Email']  = $email;
+      $_SESSION['VaiTro'] = 'ThanhVien';
 
-            header('Location: index.php?msg=' . urlencode('Tạo tài khoản thành công! Chào mừng bạn!') . '&type=success');
-            exit;
-        }
+      header('Location: index.php?msg=' . urlencode('Tạo tài khoản thành công! Chào mừng bạn!') . '&type=success');
+      exit;
     }
+  }
 }
 
 $pageTitle = 'Luxury Hotel – Đăng nhập';
@@ -136,7 +137,7 @@ require_once '../includes/navbar.php';
 
       <?php if ($loiDangNhap): ?><div class="alert alert-danger small">⚠ <?= h($loiDangNhap) ?></div><?php endif; ?>
 
-      <form method="POST" action="auth.php<?= !empty($_GET['redirect']) ? '?redirect=' . urlencode($_GET['redirect']) : '' ?>">
+      <form method="POST" action="../controllers/ctrl_taikhoan.php">
         <input type="hidden" name="action" value="dangNhap">
         <div class="mb-3">
           <label class="form-label small text-uppercase text-muted">Email</label>
@@ -156,7 +157,7 @@ require_once '../includes/navbar.php';
 
       <?php if ($loiDangKy): ?><div class="alert alert-danger small">⚠ <?= h($loiDangKy) ?></div><?php endif; ?>
 
-      <form method="POST" action="auth.php?mode=register">
+      <form method="POST" action="../controllers/ctrl_taikhoan.php">
         <input type="hidden" name="action" value="dangKy">
         <div class="mb-3">
           <label class="form-label small text-uppercase text-muted">Họ và tên</label>
