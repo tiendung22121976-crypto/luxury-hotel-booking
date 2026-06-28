@@ -29,6 +29,11 @@ $loaiPhong  = trim($_GET['loaiPhong'] ?? '');
 $sapXep     = trim($_GET['sapXep'] ?? '');
 $tienIchLoc = $_GET['tienIch'] ?? []; // mảng: minibar, bontam, banlv
 
+// Đảm bảo dữ liệu gửi lên luôn ép về mảng
+if (!is_array($tienIchLoc)) {
+    $tienIchLoc = [];
+}
+
 $loiNgay = '';
 $homNay = date('Y-m-d');
 // Kiểm tra logic ngày nếu người dùng có nhập (không bắt buộc khi mới vào trang)

@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'datPh
         exit;
     }
 
-    // 4. Tính toán tài chính
+   // 4. Tính toán tài chính
     $soDem     = tinhSoDem($ngayNhan, $ngayTra);
     $tienPhong = $phong['DonGia'] * $soDem;
 
@@ -93,6 +93,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'datPh
         if ($km) {
             $phanTramGiam = (int)$km['PhanTramGiam'];
             $maKMHopLe    = $km['MaKM'];
+        } else {
+            // VÁ LỖI: Nhập sai mã khuyến mãi sẽ quay xe báo lỗi, không cho đặt tiếp
+            header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&ngayNhan=" . urlencode($ngayNhan) . "&ngayTra=" . urlencode($ngayTra) . "&err=" . urlencode("Mã khuyến mãi không tồn tại hoặc đã hết hạn."));
+            exit;
         }
     }
     $tongThanhToan = round($tienPhong * (1 - $phanTramGiam / 100));
@@ -110,9 +114,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'datPh
     try {
         $pdo->beginTransaction();
 
+        // VÁ LỖI: Đơn mới tạo bắt buộc phải ở trạng thái 'ChoXacNhan' để Admin duyệt hàng đợi
         $stmtInsert = $pdo->prepare("
             INSERT INTO don_dat_phong (MaTK, MaPhong, NgayNhan, NgayTra, TongTien, MaKM, MaXacNhan, TrangThaiDon)
-            VALUES (:maTK, :maPhong, :ngayNhan, :ngayTra, :tongTien, :maKM, :maXacNhan, 'DaXacNhan')
+            VALUES (:maTK, :maPhong, :ngayNhan, :ngayTra, :tongTien, :maKM, :maXacNhan, 'ChoXacNhan')
         ");
         $maTKInsert = daDangNhap() ? ($_SESSION['MaTK'] ?? null) : null;
         $stmtInsert->bindValue(':maTK', $maTKInsert, $maTKInsert === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
@@ -132,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'datPh
 
         $pdo->commit();
 
-        // Thành công -> Bắt hướng trở lại trang chi tiết kèm mã xác nhận
+        // Thành công -> Bắt hướng trở lại trang chi tiết kèm mã xác nhận công khai
         header("Location: ../views/room-detail.php?id=" . urlencode($maPhong) . "&res_code=" . urlencode($maXacNhanMoi));
         exit;
     } catch (PDOException $e) {
