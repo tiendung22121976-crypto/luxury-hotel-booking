@@ -66,21 +66,35 @@ if (daDangNhap()) {
   $stmtKT->execute();
   $donDuDieuKienDanhGia = $stmtKT->fetchColumn();
 }
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'guiDanhGia') {
-  yeuCauDangNhap();
-  $maDon    = trim($_POST['maDon'] ?? '');
-  $mucDo    = (int)($_POST['mucDo'] ?? 0);
-  $binhLuan = trim($_POST['binhLuan'] ?? '');
+    yeuCauDangNhap();
+    
+    // Nhận dữ liệu từ form
+    $maDon    = trim($_POST['maDon'] ?? '');
+    $mucDo    = (int)($_POST['mucDo'] ?? 0);
+    $binhLuan = trim($_POST['binhLuan'] ?? '');
 
-  if (!$maDon || $mucDo < 1 || $mucDo > 3 || $binhLuan === '') {
-    $thongBaoLoi = 'Vui lòng chọn mức độ đánh giá và nhập nhận xét.';
-  } else {
+    // Kiểm tra dữ liệu rỗng
+    if (!$maDon || $mucDo < 1 || $mucDo > 3 || $binhLuan === '') {
+        header('Location: room-detail.php?id=' . urlencode($_POST['maPhong']) . '&err=' . urlencode('Vui lòng nhập đủ thông tin.'));
+        exit;
+    }
+
+    // Ghi vào CSDL
     $stmtInsertDG = $pdo->prepare("INSERT INTO danh_gia (MaTK, MaDon, MucDo, BinhLuan) VALUES (:maTK, :maDon, :mucDo, :binhLuan)");
-    $stmtInsertDG->execute([':maTK' => $_SESSION['MaTK'], ':maDon' => $maDon, ':mucDo' => $mucDo, ':binhLuan' => $binhLuan]);
-    header('Location: room-detail.php?id=' . urlencode($maPhong) . '&msg=' . urlencode('Cảm ơn bạn đã đánh giá!') . '&type=success');
+    $result = $stmtInsertDG->execute([
+        ':maTK'    => $_SESSION['MaTK'],
+        ':maDon'   => $maDon,
+        ':mucDo'   => $mucDo,
+        ':binhLuan'=> $binhLuan
+    ]);
+
+    if ($result) {
+        header('Location: room-detail.php?id=' . urlencode($_POST['maPhong']) . '&msg=' . urlencode('Đánh giá thành công!') . '&type=success');
+    } else {
+        header('Location: room-detail.php?id=' . urlencode($_POST['maPhong']) . '&err=' . urlencode('Lỗi lưu CSDL.'));
+    }
     exit;
-  }
 }
 
 $pageTitle = 'Luxury Hotel – ' . $phong['TenLoai'];
@@ -139,6 +153,7 @@ require_once '../includes/navbar.php';
           <form method="POST" action="room-detail.php?id=<?= urlencode($maPhong) ?>">
             <input type="hidden" name="action" value="guiDanhGia">
             <input type="hidden" name="maDon" value="<?= h($donDuDieuKienDanhGia) ?>">
+            <input type="hidden" name="maPhong" value="<?= h($maPhong) ?>">
             <select name="mucDo" class="form-select form-select-sm mb-2" style="width:auto"><option value="3">😊 Tốt</option><option value="2" selected>😐 Trung bình</option><option value="1">😞 Kém</option></select>
             <textarea name="binhLuan" class="form-control mb-2" rows="3" placeholder="Nhận xét..." required></textarea>
             <button type="submit" class="btn btn-gold btn-sm">Gửi đánh giá</button>

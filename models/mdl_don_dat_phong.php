@@ -185,3 +185,10 @@ function xoaDonDatPhongAdmin($maDon)
         return false;
     }
 }
+function hoanTatDonDatPhong($maDon) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("UPDATE don_dat_phong SET TrangThaiDon = 'HoanTat' WHERE MaDon = :maDon");
+        return $stmt->execute([':maDon' => $maDon]);
+    } catch (PDOException $e) { return false; }
+}

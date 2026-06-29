@@ -598,6 +598,10 @@ if ($action === 'sua_taikhoan' && isset($_GET['maTK'])) {
                                             <?php if ($b['TrangThaiDon'] !== 'DaHuy'): ?>
                                                 <a href="admin.php?action=huy_booking&id=<?= $b['MaDon'] ?>" class="btn-action btn-action-delete" onclick="return confirm('Hủy đơn này?')" title="Hủy"><i class="fas fa-xmark"></i></a>
                                             <?php endif; ?>
+                                            <?php if ($b['TrangThaiDon'] === 'DaXacNhan'): ?>
+                                                <a href="admin.php?tab=booking&action=hoan_tat_booking&id=<?= $b['MaDon'] ?>"
+                                                    class="btn-action btn-action-confirm" title="Hoàn tất đơn (Check-out)"><i class="fas fa-check-double"></i></a>
+                                            <?php endif; ?>
 
                                         </td>
                                     </tr>
@@ -1240,8 +1244,8 @@ if ($action === 'sua_taikhoan' && isset($_GET['maTK'])) {
                                         </td>
                                         <td>
                                             <button class="btn-action btn-action-edit" data-bs-toggle="modal" data-bs-target="#modalSuaTaiKhoan-<?= (int)$tk['MaTK'] ?>"><i class="fas fa-pen"></i></button>
-                                            
-                                               
+
+
                                             </a>
                                             <a href="admin.php?tab=taikhoan&action=xoa_taikhoan&maTK=<?= (int)$tk['MaTK'] ?>" class="btn-action btn-action-delete" onclick="return confirm('Xóa tài khoản này?')"><i class="fas fa-trash"></i></a>
                                         </td>
@@ -1271,8 +1275,8 @@ if ($action === 'sua_taikhoan' && isset($_GET['maTK'])) {
                                                                 <label class="form-label fw-semibold">Số điện thoại</label>
                                                                 <input type="text" name="sdt" class="form-control" value="<?= h($tk['SDT']) ?>" required>
                                                             </div>
-                                                            
-                                                            
+
+
                                                             <div class="col-12">
                                                                 <label class="form-label fw-semibold">Mật khẩu mới (bỏ trống nếu không đổi)</label>
                                                                 <input type="password" name="matKhau" class="form-control" placeholder="••••••••">

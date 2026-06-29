@@ -135,7 +135,7 @@ require_once '../includes/navbar.php';
                   <h6 class="mb-0" style="color:var(--navy)"><?= h($don['TenKS']) ?></h6> <?= getStatusBadgeDonHang($don['TrangThaiDon']) ?>
                 </div>
                 <p class="small text-secondary mb-1">🛏️ Phòng <?= h($don['TenLoai']) ?> – <?= h($don['SoPhong']) ?> (<?= $soDem ?> đêm)</p>
-                <p class="small text-muted mb-1">📅 <?= fmtNgay($don['NgayNhan']) ?> → <?= fmtNgay($don['Tra']) ?> | Mã: <strong><?= h($don['MaXacNhan']) ?></strong></p>
+                <p class="small text-muted mb-1">📅 <?= fmtNgay($don['NgayNhan']) ?> → <?= fmtNgay($don['NgayTra']) ?> | Mã: <strong><?= h($don['MaXacNhan']) ?></strong></p>
                 <p class="fw-bold mb-0 text-navy"><?= fmtVND($don['TongTien']) ?></p>
               </div>
               <?php if ($coTheHuy): ?>
