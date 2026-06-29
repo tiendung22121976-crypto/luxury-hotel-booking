@@ -113,12 +113,16 @@ switch ($sapXep) {
 }
 
 // ── Thực thi truy vấn bằng Prepared Statement (an toàn chống SQL Injection) ──
-$stmt = $pdo->prepare($sql);
-foreach ($params as $key => $val) {
-    $stmt->bindValue($key, $val);
+if ($loiNgay !== '') {
+    $dsPhong = []; // Không hiện kết quả nếu có lỗi
+} else {
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $key => $val) {
+        $stmt->bindValue($key, $val);
+    }
+    $stmt->execute();
+    $dsPhong = $stmt->fetchAll();
 }
-$stmt->execute();
-$dsPhong = $stmt->fetchAll();
 
 $soDem = ($ngayNhan && $ngayTra) ? tinhSoDem($ngayNhan, $ngayTra) : 1;
 
