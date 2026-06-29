@@ -401,7 +401,7 @@ if ($action === 'sua_taikhoan' && isset($_GET['maTK'])) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- CSS riêng cho khu vực Admin (đã tách ra khỏi file admin.php) -->
-    <link href="../assets/admin-style.css" rel="stylesheet">
+    <link href="../assets/admin_style.css" rel="stylesheet">
 </head>
 <body>
 
