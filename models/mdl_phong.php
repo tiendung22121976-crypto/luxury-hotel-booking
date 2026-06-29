@@ -1,4 +1,5 @@
 <?php
+
 /**
  * models/mdl_phong.php
  * Các hàm truy vấn CSDL cho bảng phong, loai_phong
@@ -14,7 +15,8 @@ require_once __DIR__ . '/../config/database.php';
  * Tìm phòng trống theo địa điểm (MaKS) và khoảng ngày
  * Logic: phòng Available, chưa có đơn đặt còn hiệu lực trùng ngày
  */
-function timPhongTrong($maKS, $ngayNhan, $ngayTra) {
+function timPhongTrong($maKS, $ngayNhan, $ngayTra)
+{
     global $pdo;
     $sql = "
         SELECT p.MaPhong, p.SoPhong, lp.TenLoai, lp.DonGia, lp.DienTich, lp.TienIch, lp.MoTa,
@@ -44,7 +46,8 @@ function timPhongTrong($maKS, $ngayNhan, $ngayTra) {
 /**
  * Lấy chi tiết 1 phòng kèm thông tin loại và khách sạn (dùng cho trang room-detail)
  */
-function getChiTietPhong($maPhong) {
+function getChiTietPhong($maPhong)
+{
     global $pdo;
     $sql = "
         SELECT p.*, lp.TenLoai, lp.DonGia, lp.DienTich, lp.TienIch, lp.MoTa AS MoTaLoai,
@@ -58,13 +61,16 @@ function getChiTietPhong($maPhong) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([':maPhong' => $maPhong]);
         return $stmt->fetch();
-    } catch (PDOException $e) { return false; }
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
 /**
  * Lấy danh sách phòng nổi bật cho trang chủ (Available, giới hạn số lượng)
  */
-function getPhongNoiBat($limit = 6) {
+function getPhongNoiBat($limit = 6)
+{
     global $pdo;
     $sql = "
         SELECT p.MaPhong, p.SoPhong, p.TrangThai,
@@ -82,14 +88,17 @@ function getPhongNoiBat($limit = 6) {
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
-    } catch (PDOException $e) { return []; }
+    } catch (PDOException $e) {
+        return [];
+    }
 }
 
 // ============================================================
 // HÀM CRUD DÀNH CHO ADMIN
 // ============================================================
 
-function getAllPhongAdmin() {
+function getAllPhongAdmin()
+{
     global $pdo;
     $sql = "
         SELECT p.*, ks.TenKS, lp.TenLoai, lp.DonGia
@@ -100,44 +109,59 @@ function getAllPhongAdmin() {
     ";
     try {
         return $pdo->query($sql)->fetchAll();
-    } catch (PDOException $e) { return []; }
+    } catch (PDOException $e) {
+        return [];
+    }
 }
 
-function getPhongById($maPhong) {
+function getPhongById($maPhong)
+{
     global $pdo;
     try {
         $stmt = $pdo->prepare("SELECT * FROM phong WHERE MaPhong = :maPhong");
         $stmt->execute([':maPhong' => $maPhong]);
         return $stmt->fetch();
-    } catch (PDOException $e) { return false; }
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
-function checkPhongExists($maPhong) {
+function checkPhongExists($maPhong)
+{
     global $pdo;
     try {
         $stmt = $pdo->prepare("SELECT COUNT(*) as cnt FROM phong WHERE MaPhong = :maPhong");
         $stmt->execute([':maPhong' => $maPhong]);
         return $stmt->fetch()['cnt'] > 0;
-    } catch (PDOException $e) { return false; }
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
 // Dropdown helper: danh sách khách sạn
-function getDanhSachKS() {
+function getDanhSachKS()
+{
     global $pdo;
     try {
         return $pdo->query("SELECT MaKS, TenKS FROM khach_san ORDER BY TenKS ASC")->fetchAll();
-    } catch (PDOException $e) { return []; }
+    } catch (PDOException $e) {
+        return [];
+    }
 }
 
 // Dropdown helper: danh sách loại phòng
-function getDanhSachLoaiPhong() {
+function getDanhSachLoaiPhong()
+{
     global $pdo;
     try {
         return $pdo->query("SELECT MaLoai, TenLoai, DonGia FROM loai_phong ORDER BY DonGia ASC")->fetchAll();
-    } catch (PDOException $e) { return []; }
+    } catch (PDOException $e) {
+        return [];
+    }
 }
 
-function addPhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai) {
+function addPhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai)
+{
     global $pdo;
     try {
         $stmt = $pdo->prepare(
@@ -151,10 +175,13 @@ function addPhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai) {
             ':maLoai'    => $maLoai,
             ':trangThai' => $trangThai,
         ]);
-    } catch (PDOException $e) { return false; }
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
-function updatePhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai) {
+function updatePhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai)
+{
     global $pdo;
     try {
         $stmt = $pdo->prepare(
@@ -168,11 +195,14 @@ function updatePhong($maPhong, $soPhong, $maKS, $maLoai, $trangThai) {
             ':maLoai'    => $maLoai,
             ':trangThai' => $trangThai,
         ]);
-    } catch (PDOException $e) { return false; }
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
 // Kiểm tra trước khi xóa: không xóa nếu còn đơn đặt chưa kết thúc
-function kiemTraPhongDangHoatDong($maPhong) {
+function kiemTraPhongDangHoatDong($maPhong)
+{
     global $pdo;
     try {
         $stmt = $pdo->prepare(
@@ -181,13 +211,65 @@ function kiemTraPhongDangHoatDong($maPhong) {
         );
         $stmt->execute([':maPhong' => $maPhong]);
         return $stmt->fetch()['cnt'] > 0;
-    } catch (PDOException $e) { return false; }
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
-function deletePhong($maPhong) {
+function deletePhong($maPhong)
+{
     global $pdo;
     try {
         $stmt = $pdo->prepare("DELETE FROM phong WHERE MaPhong = :maPhong");
         return $stmt->execute([':maPhong' => $maPhong]);
-    } catch (PDOException $e) { return false; }
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+/**
+ * Xóa đơn đặt phòng nếu phòng liên quan không ở trạng thái hoạt động
+ * Trạng thái không được xóa: 'Reserved', 'Occupied' (hoặc đơn chưa kết thúc)
+ */
+function xoaDonDatPhongAdmin($maDon)
+{
+    global $pdo;
+    try {
+        $pdo->beginTransaction();
+
+        // 1. Lấy thông tin trạng thái phòng và trạng thái đơn của đơn đặt phòng này
+        $stmt = $pdo->prepare("
+            SELECT d.MaDon, p.TrangThai AS TrangThaiPhong, d.TrangThaiDon 
+            FROM don_dat_phong d
+            INNER JOIN phong p ON d.MaPhong = p.MaPhong
+            WHERE d.MaDon = :maDon
+            FOR UPDATE
+        ");
+        $stmt->execute([':maDon' => $maDon]);
+        $booking = $stmt->fetch();
+
+        if (!$booking) {
+            $pdo->rollBack();
+            return false;
+        }
+
+        // 2. Kiểm tra nếu phòng đang hoạt động (Đang ở hoặc Đã đặt trước) 
+        // Hoặc đơn đặt phòng đang trong quá trình xử lý chưa hủy/hoàn tất
+        $phongDangHoatDong = in_array($booking['TrangThaiPhong'], ['Reserved', 'Occupied']);
+        $donChuaKetThuc    = in_array($booking['TrangThaiDon'], ['ChoXacNhan', 'DaXacNhan']);
+
+        if ($phongDangHoatDong || $donChuaKetThuc) {
+            $pdo->rollBack();
+            return 'ACTIVE_ROOM'; // Trả về mã lỗi cụ thể để báo cho View
+        }
+
+        // 3. Tiến hành xóa đơn nếu hợp lệ
+        $stmtDelete = $pdo->prepare("DELETE FROM don_dat_phong WHERE MaDon = :maDon");
+        $stmtDelete->execute([':maDon' => $maDon]);
+
+        $pdo->commit();
+        return true;
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        return false;
+    }
 }
