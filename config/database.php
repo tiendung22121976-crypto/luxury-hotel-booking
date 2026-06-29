@@ -11,7 +11,7 @@
 // Thông tin cấu hình Database (khớp với file luxuryhotel_webbooking.sql)
 $host = '127.0.0.1';
 $port = '3308';                         // Port máy chủ MySQL/MariaDB nhóm đang dùng (XAMPP có thể là 3306)
-$db   = 'luxuryhotel_webbooking';       // Tên database đúng theo file SQL được cung cấp
+$db   = 'luxuryhotel_webbooking3';       // Tên database đúng theo file SQL được cung cấp
 $user = 'root';                          // Username mặc định của XAMPP/WAMP
 $pass = '';                              // Mật khẩu mặc định (thường để trống)
 

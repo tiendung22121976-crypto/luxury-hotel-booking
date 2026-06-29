@@ -164,7 +164,7 @@ require_once '../includes/navbar.php';
           <div class="bg-light rounded p-2 mb-3 border">
             <div class="row g-0 border rounded overflow-hidden">
               <div class="col-6 border-end p-2"><div class="small text-muted" style="font-size:.7rem">NGÀY NHẬN</div><input type="date" id="wd-ngayNhan" class="form-control form-control-sm border-0 p-0" value="<?= h($ngayNhanQuery) ?>" min="<?= date('Y-m-d') ?>"></div>
-              <div class="col-6 p-2"><div class="small text-muted" style="font-size:.7rem">NGÀY TRẢ</div><input type="date" id="wd-ngayTra" class="form-control form-control-sm border-0 p-0" value="<?= h($ngayTraQuery) ?>"></div>
+              <div class="col-6 p-2"><div class="small text-muted" style="font-size:.7rem">NGÀY TRẢ</div><input type="date" id="wd-ngayTra" class="form-control form-control-sm border-0 p-0" value="<?= h($ngayTraQuery) ?>" min="<?= date('Y-m-d') ?>"></div>
             </div>
           </div>
           <div id="wd-date-err" class="alert alert-warning small d-none py-2"></div>
@@ -197,7 +197,8 @@ require_once '../includes/navbar.php';
           <textarea class="form-control form-control-sm mb-3" name="yeuCauDacBiet" rows="2" placeholder="Yêu cầu đặc biệt..."></textarea>
           
           <p class="fw-semibold small mb-1">Thanh toán</p>
-          <div class="border rounded p-2 mb-2"><div class="form-check"><input class="form-check-input" type="radio" name="payment_method" checked><label class="form-check-label small">Thẻ tín dụng / Ghi nợ (Sandbox)</label></div></div>
+          <div class="border rounded p-2 mb-2"><div class="form-check"><input class="form-check-input" type="radio" name="payment_method" checked><label class="form-check-label small">Thẻ tín dụng</label></div></div>
+          <div class="border rounded p-2 mb-2"><div class="form-check"><input class="form-check-input" type="radio" name="payment_method" checked><label class="form-check-label small">Thẻ Ghi nợ</label></div></div>
           <input class="form-control form-control-sm mb-3" name="maKM" placeholder="Mã khuyến mãi (nếu có)">
 
           <div class="d-flex justify-content-end gap-2 pt-2 border-top">
