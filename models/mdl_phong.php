@@ -230,46 +230,4 @@ function deletePhong($maPhong)
  * Xóa đơn đặt phòng nếu phòng liên quan không ở trạng thái hoạt động
  * Trạng thái không được xóa: 'Reserved', 'Occupied' (hoặc đơn chưa kết thúc)
  */
-function xoaDonDatPhongAdmin($maDon)
-{
-    global $pdo;
-    try {
-        $pdo->beginTransaction();
 
-        // 1. Lấy thông tin trạng thái phòng và trạng thái đơn của đơn đặt phòng này
-        $stmt = $pdo->prepare("
-            SELECT d.MaDon, p.TrangThai AS TrangThaiPhong, d.TrangThaiDon 
-            FROM don_dat_phong d
-            INNER JOIN phong p ON d.MaPhong = p.MaPhong
-            WHERE d.MaDon = :maDon
-            FOR UPDATE
-        ");
-        $stmt->execute([':maDon' => $maDon]);
-        $booking = $stmt->fetch();
-
-        if (!$booking) {
-            $pdo->rollBack();
-            return false;
-        }
-
-        // 2. Kiểm tra nếu phòng đang hoạt động (Đang ở hoặc Đã đặt trước) 
-        // Hoặc đơn đặt phòng đang trong quá trình xử lý chưa hủy/hoàn tất
-        $phongDangHoatDong = in_array($booking['TrangThaiPhong'], ['Reserved', 'Occupied']);
-        $donChuaKetThuc    = in_array($booking['TrangThaiDon'], ['ChoXacNhan', 'DaXacNhan']);
-
-        if ($phongDangHoatDong || $donChuaKetThuc) {
-            $pdo->rollBack();
-            return 'ACTIVE_ROOM'; // Trả về mã lỗi cụ thể để báo cho View
-        }
-
-        // 3. Tiến hành xóa đơn nếu hợp lệ
-        $stmtDelete = $pdo->prepare("DELETE FROM don_dat_phong WHERE MaDon = :maDon");
-        $stmtDelete->execute([':maDon' => $maDon]);
-
-        $pdo->commit();
-        return true;
-    } catch (PDOException $e) {
-        $pdo->rollBack();
-        return false;
-    }
-}

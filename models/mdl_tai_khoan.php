@@ -1,5 +1,4 @@
 <?php
-
 /**
  * models/mdl_tai_khoan.php
  * Các hàm truy vấn CSDL cho bảng tai_khoan (CRUD Admin)
@@ -10,8 +9,7 @@ require_once __DIR__ . '/../config/database.php';
 /**
  * Lấy toàn bộ tài khoản, có thể lọc theo từ khóa tìm kiếm (họ tên/email/sđt)
  */
-function getAllTaiKhoanAdmin($tuKhoa = '')
-{
+function getAllTaiKhoanAdmin($tuKhoa = '') {
     global $pdo;
     try {
         if ($tuKhoa !== '') {
@@ -25,25 +23,19 @@ function getAllTaiKhoanAdmin($tuKhoa = '')
             $stmt = $pdo->query("SELECT * FROM tai_khoan ORDER BY MaTK ASC");
         }
         return $stmt->fetchAll();
-    } catch (PDOException $e) {
-        return [];
-    }
+    } catch (PDOException $e) { return []; }
 }
 
-function getTaiKhoanById($maTK)
-{
+function getTaiKhoanById($maTK) {
     global $pdo;
     try {
         $stmt = $pdo->prepare("SELECT * FROM tai_khoan WHERE MaTK = :maTK");
         $stmt->execute([':maTK' => $maTK]);
         return $stmt->fetch();
-    } catch (PDOException $e) {
-        return false;
-    }
+    } catch (PDOException $e) { return false; }
 }
 
-function checkTaiKhoanTrungEmailSdt($email, $sdt, $maTKLoaiTru = null)
-{
+function checkTaiKhoanTrungEmailSdt($email, $sdt, $maTKLoaiTru = null) {
     global $pdo;
     try {
         $sql = "SELECT COUNT(*) as cnt FROM tai_khoan WHERE (Email = :email OR SDT = :sdt)";
@@ -55,19 +47,16 @@ function checkTaiKhoanTrungEmailSdt($email, $sdt, $maTKLoaiTru = null)
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetch()['cnt'] > 0;
-    } catch (PDOException $e) {
-        return false;
-    }
+    } catch (PDOException $e) { return false; }
 }
 
 /**
- * Thêm tài khoản mới (dùng bởi Admin). Mật khẩu được mã hóa Bcrypt.
+ * Thêm tài khoản mới (dùng bởi Admin). Lưu trực tiếp mật khẩu thô.
  */
-function addTaiKhoan($hoTen, $email, $sdt, $matKhau, $vaiTro, $trangThai = 'HoatDong')
-{
+function addTaiKhoan($hoTen, $email, $sdt, $matKhau, $vaiTro, $trangThai = 'HoatDong') {
     global $pdo;
     try {
-        $matKhauHash = password_hash($matKhau, PASSWORD_BCRYPT);
+        // ĐÃ XOÁ HÀM BĂM: Truyền thẳng biến $matKhau nguyên bản
         $stmt = $pdo->prepare(
             "INSERT INTO tai_khoan (HoTen, Email, SDT, MatKhau, VaiTro, TrangThai)
              VALUES (:hoTen, :email, :sdt, :matKhau, :vaiTro, :trangThai)"
@@ -76,60 +65,50 @@ function addTaiKhoan($hoTen, $email, $sdt, $matKhau, $vaiTro, $trangThai = 'Hoat
             ':hoTen'     => $hoTen,
             ':email'     => $email,
             ':sdt'       => $sdt,
-            ':matKhau'   => $matKhauHash,
+            ':matKhau'   => $matKhau,
             ':vaiTro'    => $vaiTro,
             ':trangThai' => $trangThai,
         ]);
-    } catch (PDOException $e) {
-        return false;
-    }
+    } catch (PDOException $e) { return false; }
 }
 
 /**
  * Cập nhật thông tin tài khoản. Nếu $matKhauMoi rỗng thì giữ mật khẩu cũ.
  */
-function updateTaiKhoan($maTK, $hoTen, $email, $sdt, $vaiTro, $trangThai, $matKhauMoi = '')
-{
+function updateTaiKhoan($maTK, $hoTen, $email, $sdt, $vaiTro, $trangThai, $matKhauMoi = '') {
     global $pdo;
     try {
         if ($matKhauMoi !== '') {
+            // ĐÃ XOÁ HÀM BĂM: Truyền thẳng biến $matKhauMoi vào lệnh UPDATE
             $stmt = $pdo->prepare(
                 "UPDATE tai_khoan
-                 SET HoTen = :hoTen, Email = :email, SDT = :sdt, VaiTro = :vaiTro,
-                     TrangThai = :trangThai, MatKhau = :matKhau
+                 SET HoTen = :hoTen, Email = :email, SDT = :sdt, MatKhau = :matKhau
                  WHERE MaTK = :maTK"
             );
             return $stmt->execute([
                 ':hoTen'     => $hoTen,
                 ':email'     => $email,
                 ':sdt'       => $sdt,
-                ':vaiTro'    => $vaiTro,
-                ':trangThai' => $trangThai,
-                ':matKhau'   => password_hash($matKhauMoi, PASSWORD_BCRYPT),
+                ':matKhau'   => $matKhauMoi,
                 ':maTK'      => $maTK,
             ]);
         }
         $stmt = $pdo->prepare(
             "UPDATE tai_khoan
-             SET HoTen = :hoTen, Email = :email, SDT = :sdt, VaiTro = :vaiTro, TrangThai = :trangThai
+             SET HoTen = :hoTen, Email = :email, SDT = :sdt
              WHERE MaTK = :maTK"
         );
         return $stmt->execute([
             ':hoTen'     => $hoTen,
             ':email'     => $email,
             ':sdt'       => $sdt,
-            ':vaiTro'    => $vaiTro,
-            ':trangThai' => $trangThai,
             ':maTK'      => $maTK,
         ]);
-    } catch (PDOException $e) {
-        return false;
-    }
+    } catch (PDOException $e) { return false; }
 }
 
 // Kiểm tra trước khi xóa: không xóa nếu tài khoản còn đơn đặt phòng hoặc đánh giá
-function kiemTraTaiKhoanCoDuLieu($maTK)
-{
+function kiemTraTaiKhoanCoDuLieu($maTK) {
     global $pdo;
     try {
         $stmt = $pdo->prepare(
@@ -139,27 +118,21 @@ function kiemTraTaiKhoanCoDuLieu($maTK)
         );
         $stmt->execute([':maTK1' => $maTK, ':maTK2' => $maTK]);
         return $stmt->fetch()['cnt'] > 0;
-    } catch (PDOException $e) {
-        return false;
-    }
+    } catch (PDOException $e) { return false; }
 }
 
-function deleteTaiKhoan($maTK)
-{
+function deleteTaiKhoan($maTK) {
     global $pdo;
     try {
         $stmt = $pdo->prepare("DELETE FROM tai_khoan WHERE MaTK = :maTK");
         return $stmt->execute([':maTK' => $maTK]);
-    } catch (PDOException $e) {
-        return false;
-    }
+    } catch (PDOException $e) { return false; }
 }
 
 /**
  * Khóa / Mở khóa nhanh một tài khoản (toggle)
  */
-function toggleKhoaTaiKhoan($maTK)
-{
+function toggleKhoaTaiKhoan($maTK) {
     global $pdo;
     try {
         $stmt = $pdo->prepare(
@@ -168,16 +141,13 @@ function toggleKhoaTaiKhoan($maTK)
              WHERE MaTK = :maTK"
         );
         return $stmt->execute([':maTK' => $maTK]);
-    } catch (PDOException $e) {
-        return false;
-    }
+    } catch (PDOException $e) { return false; }
 }
 
 /**
  * Thống kê số lượng tài khoản theo vai trò (cho stat-card trang Tài khoản)
  */
-function getThongKeTaiKhoan()
-{
+function getThongKeTaiKhoan() {
     global $pdo;
     try {
         $stmt = $pdo->query(

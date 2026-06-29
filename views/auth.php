@@ -79,7 +79,7 @@ require_once '../includes/navbar.php';
         <?php if ($loiQuenMK): ?><div class="alert alert-danger small py-2">⚠ <?= h($loiQuenMK) ?></div><?php endif; ?>
 
         <form method="POST" action="../controllers/ctrl_taikhoan.php">
-          <input type="hidden" name="action" value="queMatKhau">
+          <input type="hidden" name="action" value="quenMatKhau">
           <div class="mb-4"><label class="form-label small text-muted">EMAIL</label><input class="form-control" type="email" name="email" required autofocus></div>
           <button type="submit" class="btn btn-gold w-100 py-2 fw-medium">Gửi mã OTP</button>
         </form>

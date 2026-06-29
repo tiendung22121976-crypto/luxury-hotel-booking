@@ -119,7 +119,7 @@ require_once '../includes/navbar.php';
       </div>
 
       <h2 class="font-playfair h4 mb-3" style="color:var(--navy)">Đánh giá khách hàng (<?= count($dsDanhGia) ?>)</h2>
-      <?php if ($thongBaoLoi && $thongBaoLoi !== 'CONFLICT'): ?><div class="alert alert-danger">⚠ <?= h($thongBaoLoi) ?></div><?php endif; ?>
+      
       <div id="reviews-list">
         <?php if (count($dsDanhGia) === 0): ?><p class="text-muted small">Chưa có đánh giá nào.</p><?php endif; ?>
         <?php foreach ($dsDanhGia as $dg): ?>
@@ -168,6 +168,7 @@ require_once '../includes/navbar.php';
             </div>
           </div>
           <div id="wd-date-err" class="alert alert-warning small d-none py-2"></div>
+          <?php if ($thongBaoLoi && $thongBaoLoi !== 'CONFLICT'): ?><div class="alert alert-danger">⚠ <?= h($thongBaoLoi) ?></div><?php endif; ?>
           <button type="button" class="btn btn-gold w-100" id="btn-open-booking-modal">Đặt phòng ngay</button>
         <?php endif; ?>
       </div>

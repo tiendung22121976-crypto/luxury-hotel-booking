@@ -6,7 +6,7 @@ require_once '../includes/functions.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ================= XỬ LÝ ĐĂNG KÝ =================
+    // ================= 1. XỬ LÝ ĐĂNG KÝ (ĐÃ VÁ TRANG TRẮNG + BỎ BĂM MK) =================
     if ($action === 'dangKy') {
         $hoTen    = trim($_POST['hoTen'] ?? '');
         $email    = trim($_POST['email'] ?? '');
@@ -23,15 +23,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        // Kiểm tra trùng lặp bằng $pdo
+        // Kiểm tra trùng lặp Email hoặc SĐT
         $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM tai_khoan WHERE Email = ? OR SDT = ?");
         $stmtCheck->execute([$email, $sdt]);
         if ($stmtCheck->fetchColumn() > 0) {
-            header('Location: ../views/auth.php?mode=register&err=' . urlencode('Email hoặc SĐT đã tồn tại'));
+            header('Location: ../views/auth.php?mode=register&err=' . urlencode('Email hoặc SĐT đã tồn tại trong hệ thống'));
+            exit;
+        }
+
+        // VÁ LỖI TRANG TRẮNG: Chèn trực tiếp mật khẩu thô vào CSDL
+        $stmtInsert = $pdo->prepare("INSERT INTO tai_khoan (HoTen, Email, SDT, MatKhau, VaiTro) VALUES (?, ?, ?, ?, 'ThanhVien')");
+        
+        if ($stmtInsert->execute([$hoTen, $email, $sdt, $matKhau])) {
+            $maMoi = $pdo->lastInsertId();
+            $_SESSION['MaTK']   = $maMoi;
+            $_SESSION['HoTen']  = $hoTen;
+            $_SESSION['Email']  = $email;
+            $_SESSION['VaiTro'] = 'ThanhVien';
+
+            header('Location: ../views/index.php?msg=' . urlencode('Đăng ký tài khoản thành công!'));
+            exit;
+        } else {
+            header('Location: ../views/auth.php?mode=register&err=' . urlencode('Lỗi hệ thống, không thể tạo tài khoản lúc này'));
             exit;
         }
     }
-    // ================= XỬ LÝ ĐĂNG NHẬP =================
+    // ================= 2. XỬ LÝ ĐĂNG NHẬP (ĐỐI CHIẾU MẬT KHẨU THÔ) =================
     elseif ($action === 'dangNhap') {
         $email   = trim($_POST['email'] ?? '');
         $matKhau = $_POST['matKhau'] ?? '';
@@ -40,15 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Kiểm tra mật khẩu (hỗ trợ cả mật khẩu băm Bcrypt lẫn mật khẩu thô cũ)
-        $passDung = false;
-        if ($user) {
-            if (password_verify($matKhau, $user['MatKhau']) || $matKhau === $user['MatKhau']) {
-                $passDung = true;
-            }
-        }
-
-        if ($passDung) {
+        // Kiểm tra trực tiếp chuỗi mật khẩu thô
+        if ($user && $matKhau === $user['MatKhau']) {
             $_SESSION['MaTK']   = $user['MaTK'];
             $_SESSION['HoTen']  = $user['HoTen'];
             $_SESSION['Email']  = $user['Email'];
@@ -58,16 +68,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $url);
             exit;
         } else {
-            header('Location: ../views/auth.php?mode=login&err=' . urlencode('Email hoặc mật khẩu sai'));
+            header('Location: ../views/auth.php?mode=login&err=' . urlencode('Email hoặc mật khẩu không chính xác'));
             exit;
         }
     }
-    // ================= BƯỚC 1: GỬI MÃ OTP QUÊN MẬT KHẨU (LƯU VÀO SESSION) =================
+    // ================= 3. GỬI MÃ OTP QUÊN MẬT KHẨU (LƯU VÀO SESSION RAM) =================
     elseif ($action === 'quenMatKhau') {
         $email = trim($_POST['email'] ?? '');
 
         if (!$email) {
-            header('Location: ../views/auth.php?mode=forgot&err=' . urlencode('Vui lòng nhập email'));
+            header('Location: ../views/auth.php?mode=forgot&err=' . urlencode('Vui lòng nhập địa chỉ email'));
             exit;
         }
 
@@ -76,15 +86,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user) {
-            // 1. Sinh ngẫu nhiên mã OTP 6 chữ số
             $otp = random_int(100000, 999999);
 
-            // 2. KHÔNG DÙNG SQL UPDATE: Lưu thẳng vào Session của trình duyệt khách hàng
+            // Ghi nhớ tạm vào RAM máy chủ
             $_SESSION['reset_otp']        = (string)$otp;
-            $_SESSION['reset_otp_expire'] = time() + (5 * 60); // Thời hạn 5 phút
-            $_SESSION['otp_email']        = $email;            // Lưu email để đối chiếu
+            $_SESSION['reset_otp_expire'] = time() + (5 * 60); // Hạn 5 phút
+            $_SESSION['otp_email']        = $email;
 
-            // Gửi OTP qua URL để hiển thị trực tiếp lên giao diện Demo
             header('Location: ../views/auth.php?mode=forgot&step=otp&demo_otp=' . urlencode($otp));
             exit;
         } else {
@@ -92,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     }
-    // ================= BƯỚC 2: XÁC NHẬN OTP TỪ SESSION & ĐẶT LẠI MẬT KHẨU =================
+    // ================= 4. XÁC NHẬN OTP & ĐẶT LẠI MẬT KHẨU =================
     elseif ($action === 'xacNhanOTP') {
         $email       = trim($_POST['email'] ?? '');
         $otpNhap     = trim($_POST['otp'] ?? '');
@@ -108,42 +116,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         if (strlen($matKhauMoi) < 6) {
-            header('Location: ../views/auth.php?mode=forgot&step=otp&err=' . urlencode('Mật khẩu mới tối thiểu 6 ký tự'));
+            header('Location: ../views/auth.php?mode=forgot&step=otp&err=' . urlencode('Mật khẩu mới phải từ 6 ký tự trở lên'));
             exit;
         }
 
-        // 1. Lấy dữ liệu OTP đã lưu trong Session ra kiểm tra
         $sessionOtp    = $_SESSION['reset_otp'] ?? null;
         $sessionExpire = $_SESSION['reset_otp_expire'] ?? null;
         $sessionEmail  = $_SESSION['otp_email'] ?? null;
 
         if (!$sessionOtp || !$sessionExpire || $sessionEmail !== $email) {
-            header('Location: ../views/auth.php?mode=forgot&err=' . urlencode('Yêu cầu không hợp lệ hoặc phiên làm việc đã bị hủy, vui lòng làm lại từ đầu'));
+            header('Location: ../views/auth.php?mode=forgot&err=' . urlencode('Phiên giao dịch hết hạn hoặc không hợp lệ, vui lòng thao tác lại'));
             exit;
         }
 
-        // 2. Kiểm tra thời gian hết hạn (Quá 5 phút = hủy)
         if (time() > $sessionExpire) {
             unset($_SESSION['reset_otp'], $_SESSION['reset_otp_expire'], $_SESSION['otp_email']);
-            header('Location: ../views/auth.php?mode=forgot&err=' . urlencode('Mã OTP đã hết hạn (quá 5 phút), vui lòng yêu cầu mã mới'));
+            header('Location: ../views/auth.php?mode=forgot&err=' . urlencode('Mã OTP đã hết hạn, vui lòng yêu cầu mã mới'));
             exit;
         }
 
-        // 3. Đối chiếu mã nhập vào
         if ($sessionOtp !== $otpNhap) {
             header('Location: ../views/auth.php?mode=forgot&step=otp&err=' . urlencode('Mã OTP nhập vào không chính xác'));
             exit;
         }
 
-        // 4. OTP hợp lệ -> Mã hóa Bcrypt và cập nhật mật khẩu mới vào SQL
-        $matKhauHash = password_hash($matKhauMoi, PASSWORD_BCRYPT);
+        // Cập nhật thẳng mật khẩu mới dạng thô xuống CSDL
         $stmtU = $pdo->prepare("UPDATE tai_khoan SET MatKhau = :mk WHERE Email = :em");
-        $stmtU->execute([':mk' => $matKhauHash, ':em' => $email]);
+        $stmtU->execute([':mk' => $matKhauMoi, ':em' => $email]);
 
-        // 5. Đổi xong xóa sạch Session OTP đi để không bị dùng lại
         unset($_SESSION['reset_otp'], $_SESSION['reset_otp_expire'], $_SESSION['otp_email']);
 
-        header('Location: ../views/auth.php?mode=login&msg=' . urlencode('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.'));
+        header('Location: ../views/auth.php?mode=login&msg=' . urlencode('Đặt lại mật khẩu thành công! Vui lòng đăng nhập.'));
         exit;
     }
 }
