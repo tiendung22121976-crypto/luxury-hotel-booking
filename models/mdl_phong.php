@@ -226,8 +226,5 @@ function deletePhong($maPhong)
         return false;
     }
 }
-/**
- * Xóa đơn đặt phòng nếu phòng liên quan không ở trạng thái hoạt động
- * Trạng thái không được xóa: 'Reserved', 'Occupied' (hoặc đơn chưa kết thúc)
- */
+
 

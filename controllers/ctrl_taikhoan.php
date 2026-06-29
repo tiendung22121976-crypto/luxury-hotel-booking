@@ -6,7 +6,7 @@ require_once '../includes/functions.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ================= 1. XỬ LÝ ĐĂNG KÝ (ĐÃ VÁ TRANG TRẮNG + BỎ BĂM MK) =================
+    // ================= 1. XỬ LÝ ĐĂNG KÝ  =================
     if ($action === 'dangKy') {
         $hoTen    = trim($_POST['hoTen'] ?? '');
         $email    = trim($_POST['email'] ?? '');
